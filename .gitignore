@@ -8,9 +8,8 @@
 # npm
 node_modules
 
-# Don't include the compiled main.js file in the repo.
-# They should be uploaded to GitHub releases instead.
-main.js
+# Note: main.js (the compiled plugin) IS committed so the repo can be
+# dropped straight into .obsidian/plugins/ and used without a build step.
 
 # Exclude sourcemaps
 *.map
@@ -20,3 +19,5 @@ data.json
 
 # Exclude macOS Finder (System Explorer) View States
 .DS_Store
+
+AGENTS.md
