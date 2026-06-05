@@ -1,11 +1,11 @@
 {
-	"id": "sample-plugin",
-	"name": "Sample Plugin",
+	"id": "stratum-habit-tracker",
+	"name": "Stratum Habit Tracker",
 	"version": "1.0.0",
 	"minAppVersion": "1.0.0",
-	"description": "Demonstrates some of the capabilities of the Obsidian API.",
-	"author": "Obsidian",
-	"authorUrl": "https://obsidian.md",
-	"fundingUrl": "https://obsidian.md/pricing",
+	"description": "A habit tracking dashboard built into Obsidian. View your habits as a calendar heatmap or a date matrix, log daily completions, manage a daily to-do list, and write daily notes — all without leaving your vault.",
+	"author": "julianctl",
+	"authorUrl": "https://github.com/julianctl",
+	"fundingUrl": "",
 	"isDesktopOnly": false
 }
