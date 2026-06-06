@@ -31,6 +31,7 @@ interface SidebarProps {
 	onReorderCategories: (fromCatId: string, toIndex: number) => void;
 	onRenameCategory: (categoryId: string, name: string) => void;
 	onAddHabitToCategory: (name: string, categoryId: string) => void;
+	onQuickAddHabit: () => Promise<string>;
 }
 
 export default function Sidebar({
@@ -42,34 +43,44 @@ export default function Sidebar({
 	onArchiveHabit, onUnarchiveHabit, onSetHabitStartDate,
 	skipDeleteConfirm, onSetSkipDeleteConfirm,
 	groupByCategory, onMoveHabitInGroup, onReorderCategories, onRenameCategory, onAddHabitToCategory,
+	onQuickAddHabit,
 }: SidebarProps) {
 	const [configHabitId, setConfigHabitId] = useState<string | null>(null);
+	const [newHabitId, setNewHabitId] = useState<string | null>(null);
+
+	async function handleQuickAdd() {
+		const id = await onQuickAddHabit();
+		setNewHabitId(id);
+		setConfigHabitId(id);
+	}
 
 	// Config page: replace sidebar content with the habit's settings.
 	if (configHabitId) {
 		const habit = habits.find((h) => h.id === configHabitId);
 		if (habit) {
+			const isNew = newHabitId === configHabitId;
 			return (
 				<div className="stratum-sidebar-content">
-					<button className="stratum-sidebar-back" onClick={() => setConfigHabitId(null)} title="Back">
+					<button className="stratum-sidebar-back" onClick={() => { setConfigHabitId(null); setNewHabitId(null); }} title="Back">
 						←
 					</button>
 					<HabitConfigMenu
 						extraClass="stratum-config-menu--sidebar-page"
 						habit={habit}
 						categories={categories}
+						initialClearName={isNew}
 						onRename={(name) => onRenameHabit(habit.id, name)}
 						onSetColor={(c) => onSetHabitColor(habit.id, c)}
 						onSetCategory={(catId) => onSetHabitCategory(habit.id, catId)}
 						onCreateCategory={(name, c) => onCreateCategory(habit.id, name, c)}
 						onSetCategoryColor={onSetCategoryColor}
-						onArchive={(endDate) => { onArchiveHabit(habit.id, endDate); setConfigHabitId(null); }}
-						onUnarchive={(startDate) => { onUnarchiveHabit(habit.id, startDate); setConfigHabitId(null); }}
+						onArchive={(endDate) => { onArchiveHabit(habit.id, endDate); setConfigHabitId(null); setNewHabitId(null); }}
+						onUnarchive={(startDate) => { onUnarchiveHabit(habit.id, startDate); setConfigHabitId(null); setNewHabitId(null); }}
 						onSetStartDate={(date) => onSetHabitStartDate(habit.id, date)}
 						skipDeleteConfirm={skipDeleteConfirm}
-						onDelete={() => { onDeleteHabit(habit.id); setConfigHabitId(null); }}
+						onDelete={() => { onDeleteHabit(habit.id); setConfigHabitId(null); setNewHabitId(null); }}
 						onSetSkipDeleteConfirm={onSetSkipDeleteConfirm}
-						onClose={() => setConfigHabitId(null)}
+						onClose={() => { setConfigHabitId(null); setNewHabitId(null); }}
 					/>
 				</div>
 			);
@@ -98,6 +109,7 @@ export default function Sidebar({
 				onRenameCategory={onRenameCategory}
 				onSetCategoryColor={onSetCategoryColor}
 				onEditHabit={setConfigHabitId}
+				onQuickAddHabit={handleQuickAdd}
 			/>
 		</div>
 	);

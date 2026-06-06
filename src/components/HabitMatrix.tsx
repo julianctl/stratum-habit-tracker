@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { Category, Habit, HabitLog } from '../types';
 import { isHabitActiveOn, isHabitCurrentlyActive } from '../utils';
 import MatrixCell from './MatrixCell';
@@ -49,10 +50,24 @@ function formatHeader(date: string, mode: ViewMode, index: number): string {
 	return d.getDate().toString();
 }
 
+// Approximate popover dimensions for pre-render clamping.
+const POPOVER_W = 188;
+const POPOVER_H = 114;
+
+interface NotePopover {
+	habitId: string;
+	date: string;
+	x: number;
+	y: number;
+}
+
 export default function HabitMatrix({ habits, categories, logMap, monthDays, defaultColor, onToggleLog, onSetLogNote, onHabitContextMenu }: HabitMatrixProps) {
 	const [mode, setMode] = useState<ViewMode>('week');
 	const [pageOffset, setPageOffset] = useState(0);
 	const [showArchived, setShowArchived] = useState(false);
+	const [notePopover, setNotePopover] = useState<NotePopover | null>(null);
+	const [noteDraft, setNoteDraft] = useState('');
+	const noteTextareaRef = useRef<HTMLTextAreaElement>(null);
 	const scrollRef = useRef<HTMLDivElement>(null);
 
 	const dates = useMemo(() => getDates(mode, monthDays, pageOffset), [mode, monthDays, pageOffset]);
@@ -93,6 +108,21 @@ export default function HabitMatrix({ habits, categories, logMap, monthDays, def
 		setPageOffset(0);
 	}
 
+	function openNote(habitId: string, date: string, clientX: number, clientY: number) {
+		const log = logMap.get(`${habitId}::${date}`);
+		// Clamp so popover doesn't overflow the viewport bottom.
+		const x = Math.min(clientX, window.innerWidth - POPOVER_W - 8);
+		const y = Math.min(clientY, window.innerHeight - POPOVER_H - 8);
+		setNoteDraft(log?.note ?? '');
+		setNotePopover({ habitId, date, x, y });
+		window.setTimeout(() => noteTextareaRef.current?.focus(), 0);
+	}
+
+	function commitNote() {
+		if (notePopover) onSetLogNote(notePopover.habitId, notePopover.date, noteDraft);
+		setNotePopover(null);
+	}
+
 	if (habits.length === 0) {
 		return (
 			<div className="stratum-matrix stratum-matrix--empty">
@@ -107,6 +137,7 @@ export default function HabitMatrix({ habits, categories, logMap, monthDays, def
 		: `${LABEL_WIDTH}px repeat(${dates.length}, ${COL_WIDTH}px)`;
 
 	return (
+		<>
 		<div className="stratum-matrix">
 			<div className="stratum-matrix__toolbar">
 				<span className="stratum-matrix__title">Habit Matrix</span>
@@ -187,11 +218,10 @@ export default function HabitMatrix({ habits, categories, logMap, monthDays, def
 											date={date}
 											isCompleted={!!log}
 											hasNote={!!log?.note}
-											note={log?.note ?? ''}
 											color={fill}
 											isToday={date === todayStr}
 											onToggle={() => onToggleLog(habit.id, date)}
-											onSetNote={(note) => onSetLogNote(habit.id, date, note)}
+											onOpenNote={(cx, cy) => openNote(habit.id, date, cx, cy)}
 										/>
 									);
 								})}
@@ -201,5 +231,31 @@ export default function HabitMatrix({ habits, categories, logMap, monthDays, def
 				</div>
 			</div>
 		</div>
+		{notePopover && createPortal(
+			<>
+				<div className="stratum-float-backdrop" onClick={commitNote} />
+				<div
+					className="stratum-cell__note-popover"
+					style={{ left: notePopover.x, top: notePopover.y }}
+					onClick={(e) => e.stopPropagation()}
+				>
+					<textarea
+						ref={noteTextareaRef}
+						value={noteDraft}
+						onChange={(e) => setNoteDraft(e.target.value)}
+						onBlur={commitNote}
+						onKeyDown={(e) => {
+							if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); commitNote(); }
+							if (e.key === 'Escape') { e.preventDefault(); setNotePopover(null); }
+						}}
+						placeholder="Add a note..."
+						rows={3}
+					/>
+					<span className="stratum-cell__note-hint">ESC to cancel · Enter to save</span>
+				</div>
+			</>,
+			document.body,
+		)}
+		</>
 	);
 }

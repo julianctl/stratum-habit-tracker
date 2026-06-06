@@ -96,6 +96,17 @@
 }
 
 /* Section titles */
+.stratum-section-title-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	margin: 0 0 8px;
+}
+
+.stratum-section-title-row .stratum-section-title {
+	margin: 0;
+}
+
 .stratum-section-title {
 	font-size: var(--font-ui-small);
 	font-weight: 600;
@@ -103,6 +114,19 @@
 	text-transform: uppercase;
 	letter-spacing: 0.05em;
 	margin: 0 0 8px;
+}
+
+.stratum-cat-header__count {
+	font-size: var(--font-ui-smaller);
+	color: var(--text-faint);
+	flex-shrink: 0;
+}
+
+.stratum-config-menu__name-error {
+	font-size: var(--font-ui-smaller);
+	color: var(--text-error);
+	margin-bottom: 4px;
+	display: block;
 }
 
 /* Inputs & buttons */
@@ -335,10 +359,8 @@
 }
 
 .stratum-cell__note-popover {
-	position: absolute;
-	top: 26px;
-	right: 0;
-	z-index: 100;
+	position: fixed;
+	z-index: var(--layer-menu);
 	background: var(--background-primary);
 	border: 1px solid var(--background-modifier-border);
 	border-radius: var(--radius-m);
@@ -423,6 +445,12 @@
 	align-items: center;
 	gap: 6px;
 	font-size: var(--font-ui-small);
+	padding: 1px 2px;
+	border-radius: var(--radius-s);
+}
+
+.stratum-habit-item:hover {
+	background: var(--background-modifier-hover);
 }
 
 .stratum-habit-item__name {
@@ -441,6 +469,8 @@
 	cursor: grab;
 	font-size: 12px;
 	flex-shrink: 0;
+	line-height: 1;
+	padding-top: 1px;
 }
 
 .stratum-habit-item--drop-before {
@@ -472,10 +502,15 @@
 	line-height: 1;
 	padding: 2px 3px;
 	transition: background 0.1s, color 0.1s;
+	opacity: 0;
+	transition: opacity 0.1s;
+}
+
+.stratum-habit-item:hover .stratum-habit-item__config {
+	opacity: 1;
 }
 
 .stratum-habit-item__config:hover {
-	background: var(--interactive-hover);
 	color: var(--text-normal);
 }
 
@@ -666,7 +701,7 @@
 	display: flex;
 	align-items: center;
 	gap: 5px;
-	padding: 3px 2px;
+	padding: 1px 2px;
 	border-radius: var(--radius-s);
 	cursor: grab;
 	border-top: 2px solid transparent;
@@ -691,9 +726,11 @@
 	box-shadow: none !important;
 	color: var(--text-muted);
 	cursor: pointer;
-	font-size: 10px;
+	font-size: 14px;
 	line-height: 1;
-	padding: 0 1px;
+	padding: 0;
+	width: 10px;
+	text-align: center;
 	flex-shrink: 0;
 }
 

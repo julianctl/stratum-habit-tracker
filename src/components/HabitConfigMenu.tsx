@@ -24,7 +24,7 @@ function IconTrash(props: SVGProps<SVGSVGElement>) {
 import type { Category, Habit } from '../types';
 import { isHabitCurrentlyActive, todayISO } from '../utils';
 
-const NEW_CATEGORY_PALETTE = ['#4caf50', '#2196f3', '#ff9800', '#e91e63', '#9c27b0', '#00bcd4'];
+const NEW_CATEGORY_PALETTE = ['#F5F3EF', '#584738', '#D8CFC4', '#5F6A6A', '#DCB482', '#8A9A9D'];
 
 interface HabitConfigMenuProps {
 	habit: Habit;
@@ -32,6 +32,7 @@ interface HabitConfigMenuProps {
 	extraClass?: string;
 	style?: CSSProperties;
 	skipDeleteConfirm: boolean;
+	initialClearName?: boolean;
 	onRename: (name: string) => void;
 	onSetColor: (color?: string) => void;
 	onSetCategory: (categoryId?: string) => void;
@@ -49,12 +50,14 @@ export default function HabitConfigMenu({
 	habit, categories,
 	extraClass, style,
 	skipDeleteConfirm,
+	initialClearName,
 	onRename, onSetColor, onSetCategory, onCreateCategory, onSetCategoryColor,
 	onArchive, onUnarchive, onSetStartDate,
 	onDelete, onSetSkipDeleteConfirm,
 	onClose,
 }: HabitConfigMenuProps) {
-	const [name, setName] = useState(habit.name);
+	const [name, setName] = useState(initialClearName ? '' : habit.name);
+	const [nameError, setNameError] = useState(false);
 	const [creatingCategory, setCreatingCategory] = useState(false);
 	const [newCatName, setNewCatName] = useState('');
 	const [newCatColor, setNewCatColor] = useState(
@@ -78,7 +81,9 @@ export default function HabitConfigMenu({
 
 	function commitName() {
 		const trimmed = name.trim();
-		if (trimmed && trimmed !== habit.name) onRename(trimmed);
+		if (!trimmed) { setNameError(true); return; }
+		setNameError(false);
+		if (trimmed !== habit.name) onRename(trimmed);
 	}
 
 	function onCategorySelect(value: string) {
@@ -101,13 +106,15 @@ export default function HabitConfigMenu({
 	return (
 		<div className={`stratum-config-menu${extraClass ? ` ${extraClass}` : ''}`} style={style} onClick={(e) => e.stopPropagation()}>
 			<label className="stratum-config-menu__label">Name</label>
+			{nameError && <span className="stratum-config-menu__name-error">Habit name cannot be empty</span>}
 			<div className="stratum-config-menu__name-row">
 				<input
 					className="stratum-input"
 					value={name}
-					onChange={(e) => setName(e.target.value)}
+					autoFocus={initialClearName}
+					onChange={(e) => { setName(e.target.value); if (nameError) setNameError(false); }}
 					onBlur={commitName}
-					onKeyDown={(e) => { if (e.key === 'Enter') { commitName(); onClose(); } if (e.key === 'Escape') onClose(); }}
+					onKeyDown={(e) => { if (e.key === 'Enter') { commitName(); if (name.trim()) onClose(); } if (e.key === 'Escape') onClose(); }}
 				/>
 				{isActive && (
 					<button

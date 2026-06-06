@@ -118,10 +118,11 @@ export class StratumStore {
 		const habits = store.data.habits.map((h) =>
 			h.id === id ? { ...h, categoryId: categoryId || undefined } : h,
 		);
-		const next = {
+		const withCategory = {
 			...store,
 			data: { ...store.data, habits: this.maybeRegroup(store, habits) },
 		};
+		const next = this.pruneEmptyCategories(withCategory);
 		await this.save(next);
 		return next;
 	}

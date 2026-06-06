@@ -15,13 +15,14 @@ interface HabitManagerProps {
 	onRenameCategory: (categoryId: string, name: string) => void;
 	onSetCategoryColor: (categoryId: string, color: string) => void;
 	onEditHabit: (habitId: string) => void;
+	onQuickAddHabit: () => void;
 }
 
 
 export default function HabitManager({
 	habits, categories,
 	groupByCategory,
-	onAddHabit, onAddHabitToCategory, onDeleteHabit, onReorderHabits, onMoveHabitInGroup, onReorderCategories, onRenameCategory, onSetCategoryColor, onEditHabit,
+	onAddHabit, onAddHabitToCategory, onDeleteHabit, onReorderHabits, onMoveHabitInGroup, onReorderCategories, onRenameCategory, onSetCategoryColor, onEditHabit, onQuickAddHabit,
 }: HabitManagerProps) {
 	const [input, setInput] = useState('');
 	const [archivedOpen, setArchivedOpen] = useState(false);
@@ -59,7 +60,10 @@ export default function HabitManager({
 
 	return (
 		<div className="stratum-habit-manager">
-			<h3 className="stratum-section-title">Habits</h3>
+			<div className="stratum-section-title-row">
+				<h3 className="stratum-section-title">Habits</h3>
+				<button className="stratum-cat-header__add" onClick={onQuickAddHabit} title="Add habit">+</button>
+			</div>
 			{!groupByCategory && (
 				<div className="stratum-todos__input-row">
 					<input
@@ -145,19 +149,25 @@ function HabitRow({ habit, color, draggable, dropClass, onEditHabit, onDragStart
 		<li
 			className={`stratum-habit-item ${!isActive ? 'stratum-habit-item--archived' : ''} ${dropClass ?? ''}`}
 			draggable={draggable}
+			onClick={() => onEditHabit(habit.id)}
 			onDragStart={onDragStart}
 			onDragOver={onDragOver}
 			onDrop={onDrop}
 			onDragEnd={onDragEnd}
+			style={{ cursor: 'pointer' }}
 		>
-			<span className="stratum-habit-item__drag-handle" style={draggable ? {} : { visibility: 'hidden' }}>⠿</span>
+			<span
+				className="stratum-habit-item__drag-handle"
+				style={draggable ? {} : { visibility: 'hidden' }}
+				onClick={(e) => e.stopPropagation()}
+			>⠿</span>
 			<span className="stratum-habit-item__name">
 				<span className="stratum-habit-item__dot" style={{ background: color ?? 'var(--text-faint)' }} />
 				{habit.name}
 			</span>
 			<button
 				className="stratum-habit-item__config"
-				onClick={() => onEditHabit(habit.id)}
+				onClick={(e) => { e.stopPropagation(); onEditHabit(habit.id); }}
 				title="Configure habit"
 			>⚙</button>
 		</li>
@@ -264,15 +274,6 @@ function GroupedList({
 	// categoryId → pending new habit name (empty string = showing input)
 	const [addingTo, setAddingTo] = useState<string | null>(null);
 	const [addDraft, setAddDraft] = useState('');
-	const [addingUncat, setAddingUncat] = useState(false);
-	const [addUncatDraft, setAddUncatDraft] = useState('');
-
-	function commitAddUncat() {
-		const trimmed = addUncatDraft.trim();
-		if (trimmed) onAddHabit(trimmed);
-		setAddingUncat(false);
-		setAddUncatDraft('');
-	}
 
 	function startRename(cat: Category) {
 		setRenamingId(cat.id);
@@ -431,11 +432,7 @@ function GroupedList({
 							</span>
 						</>
 					)}
-					<button
-						className="stratum-cat-header__add"
-						onClick={() => { if (!isAdding) startAdd(cat.id); }}
-						title="Add habit to category"
-					>+</button>
+					<span className="stratum-cat-header__count">{list.length}</span>
 				</div>
 				{!isCollapsed && (
 					<ul
@@ -473,9 +470,6 @@ function GroupedList({
 								/>
 							</li>
 						)}
-						{list.length === 0 && !isAdding && (
-							<li className="stratum-cat-group__empty">No habits</li>
-						)}
 					</ul>
 				)}
 			</div>
@@ -495,11 +489,7 @@ function GroupedList({
 						{isCollapsed ? '▸' : '▾'}
 					</button>
 					<span className="stratum-cat-header__name stratum-cat-header__name--uncat">Uncategorized</span>
-					<button
-						className="stratum-cat-header__add"
-						onClick={() => { if (!addingUncat) { setAddingUncat(true); setAddUncatDraft(''); } }}
-						title="Add uncategorized habit"
-					>+</button>
+					<span className="stratum-cat-header__count">{uncategorized.length}</span>
 				</div>
 				{!isCollapsed && (
 					<ul
@@ -521,25 +511,6 @@ function GroupedList({
 								onDragEnd={clearDrag}
 							/>
 						))}
-						{addingUncat && (
-							<li className="stratum-habit-item stratum-habit-item--new">
-								<input
-									className="stratum-input stratum-habit-item__new-input"
-									value={addUncatDraft}
-									autoFocus
-									placeholder="New habit..."
-									onChange={(e) => setAddUncatDraft(e.target.value)}
-									onBlur={commitAddUncat}
-									onKeyDown={(e) => {
-										if (e.key === 'Enter') { e.preventDefault(); commitAddUncat(); }
-										if (e.key === 'Escape') { e.preventDefault(); setAddingUncat(false); setAddUncatDraft(''); }
-									}}
-								/>
-							</li>
-						)}
-						{uncategorized.length === 0 && !addingUncat && (
-							<li className="stratum-cat-group__empty">No habits</li>
-						)}
 					</ul>
 				)}
 			</div>

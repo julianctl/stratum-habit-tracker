@@ -81,6 +81,11 @@ export default function App({ plugin }: AppProps) {
 	// Habit mutations
 	const onAddHabit = (name: string, color?: string) =>
 		mutate((s) => plugin.store.addHabit(s, name, color));
+	const onQuickAddHabit = async (): Promise<string> => {
+		const next = await plugin.store.addHabit(store!, 'New habit');
+		setStore(next);
+		return next.data.habits[next.data.habits.length - 1]!.id;
+	};
 	const onDeleteHabit = (id: string) =>
 		mutate((s) => plugin.store.deleteHabit(s, id));
 	const onRenameHabit = (id: string, name: string) =>
@@ -197,6 +202,7 @@ export default function App({ plugin }: AppProps) {
 					onReorderCategories={onReorderCategories}
 					onRenameCategory={onRenameCategory}
 					onAddHabitToCategory={onAddHabitToCategory}
+					onQuickAddHabit={onQuickAddHabit}
 				/>
 			</aside>
 		</div>
