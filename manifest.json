@@ -1,7 +1,7 @@
 {
 	"id": "stratum-habit-tracker",
 	"name": "Stratum Habit Tracker",
-	"version": "1.0.0",
+	"version": "0.1.0",
 	"minAppVersion": "1.7.2",
 	"description": "A habit tracking dashboard built into Obsidian. View your habits as a calendar heatmap or a date matrix, log daily completions, manage a daily to-do list, and write daily notes — all without leaving your vault.",
 	"author": "julianctl",
