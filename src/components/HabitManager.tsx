@@ -5,34 +5,34 @@ import { isHabitCurrentlyActive } from '../utils';
 interface HabitManagerProps {
 	habits: Habit[];
 	categories: Category[];
+	groupByCategory: boolean;
+	uncategorizedPosition: 'top' | 'bottom';
 	onAddHabit: (name: string, color?: string) => void;
 	onDeleteHabit: (id: string) => void;
 	onReorderHabits: (fromIndex: number, toIndex: number) => void;
+	onMoveHabitInGroup: (habitId: string, targetCategoryId: string | undefined, beforeHabitId: string | null) => void;
+	onReorderCategories: (fromCatId: string, toIndex: number) => void;
 	onEditHabit: (habitId: string) => void;
 }
 
+const UNCAT = '__uncat__';
+
 export default function HabitManager({
 	habits, categories,
-	onAddHabit, onDeleteHabit, onReorderHabits, onEditHabit,
+	groupByCategory, uncategorizedPosition,
+	onAddHabit, onDeleteHabit, onReorderHabits, onMoveHabitInGroup, onReorderCategories, onEditHabit,
 }: HabitManagerProps) {
 	const [input, setInput] = useState('');
-	const [dropPosition, setDropPosition] = useState<number | null>(null);
 	const [archivedOpen, setArchivedOpen] = useState(false);
-	const dragFromStoreIndex = useRef<number | null>(null);
+	const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
 
-	const indexedActive = useMemo(
-		() => habits.map((h, i) => ({ habit: h, storeIndex: i })).filter(({ habit }) => isHabitCurrentlyActive(habit)),
-		[habits],
-	);
-	const indexedArchived = useMemo(
-		() => habits.map((h, i) => ({ habit: h, storeIndex: i })).filter(({ habit }) => !isHabitCurrentlyActive(habit)),
-		[habits],
-	);
+	const activeHabits = useMemo(() => habits.filter(isHabitCurrentlyActive), [habits]);
+	const archivedHabits = useMemo(() => habits.filter((h) => !isHabitCurrentlyActive(h)), [habits]);
 
-	function storeIndexForDropPos(pos: number): number {
-		if (pos < indexedActive.length) return indexedActive[pos]!.storeIndex;
-		return habits.length;
-	}
+	const sortedCategories = useMemo(
+		() => [...categories].sort((a, b) => a.order - b.order),
+		[categories],
+	);
 
 	function submitAdd() {
 		const name = input.trim();
@@ -41,73 +41,19 @@ export default function HabitManager({
 		setInput('');
 	}
 
-	function resolveVisualPos(e: DragEvent, displayIndex: number): number {
-		const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-		return e.clientY < rect.top + rect.height / 2 ? displayIndex : displayIndex + 1;
-	}
-
-	function onDragStart(storeIndex: number) {
-		dragFromStoreIndex.current = storeIndex;
-	}
-
-	function onDragOver(e: DragEvent, displayIndex: number) {
-		e.preventDefault();
-		setDropPosition(resolveVisualPos(e, displayIndex));
-	}
-
-	function onDrop(e: DragEvent, displayIndex: number) {
-		const visualPos = resolveVisualPos(e, displayIndex);
-		const storePos = storeIndexForDropPos(visualPos);
-		const fromStoreIdx = dragFromStoreIndex.current;
-		if (fromStoreIdx !== null) {
-			onReorderHabits(fromStoreIdx, storePos);
-		}
-		dragFromStoreIndex.current = null;
-		setDropPosition(null);
-	}
-
-	function onDragEnd() {
-		dragFromStoreIndex.current = null;
-		setDropPosition(null);
+	function toggleCollapse(key: string) {
+		setCollapsed((prev) => {
+			const next = new Set(prev);
+			if (next.has(key)) next.delete(key);
+			else next.add(key);
+			return next;
+		});
 	}
 
 	function effectiveColor(habit: Habit): string | undefined {
 		if (habit.color) return habit.color;
 		if (habit.categoryId) return categories.find((c) => c.id === habit.categoryId)?.color;
 		return undefined;
-	}
-
-	function renderHabitRow(habit: Habit, storeIndex: number, draggable: boolean, displayIndex?: number) {
-		const color = effectiveColor(habit);
-		const isActive = isHabitCurrentlyActive(habit);
-		const isDropBefore = draggable && dropPosition === displayIndex;
-		const isDropAfter = draggable && dropPosition === indexedActive.length && displayIndex === indexedActive.length - 1;
-
-		return (
-			<li
-				key={habit.id}
-				className={`stratum-habit-item ${!isActive ? 'stratum-habit-item--archived' : ''} ${isDropBefore ? 'stratum-habit-item--drop-before' : ''} ${isDropAfter ? 'stratum-habit-item--drop-after' : ''}`}
-				draggable={draggable}
-				onDragStart={draggable && displayIndex !== undefined ? () => onDragStart(storeIndex) : undefined}
-				onDragOver={draggable && displayIndex !== undefined ? (e) => onDragOver(e, displayIndex) : undefined}
-				onDrop={draggable && displayIndex !== undefined ? (e) => onDrop(e, displayIndex) : undefined}
-				onDragEnd={draggable ? onDragEnd : undefined}
-			>
-				<span className="stratum-habit-item__drag-handle" style={draggable ? {} : { visibility: 'hidden' }}>⠿</span>
-				<span className="stratum-habit-item__name">
-					<span
-						className="stratum-habit-item__dot"
-						style={{ background: color ?? 'var(--text-faint)' }}
-					/>
-					{habit.name}
-				</span>
-				<button
-					className="stratum-habit-item__config"
-					onClick={() => onEditHabit(habit.id)}
-					title="Configure habit"
-				>⚙</button>
-			</li>
-		);
 	}
 
 	return (
@@ -124,28 +70,345 @@ export default function HabitManager({
 				/>
 				<button className="stratum-btn" onClick={submitAdd}>+</button>
 			</div>
-			<ul className="stratum-habits__list">
-				{indexedActive.map(({ habit, storeIndex }, displayIndex) =>
-					renderHabitRow(habit, storeIndex, true, displayIndex),
-				)}
-			</ul>
-			{indexedArchived.length > 0 && (
+
+			{groupByCategory ? (
+				<GroupedList
+					activeHabits={activeHabits}
+					sortedCategories={sortedCategories}
+					uncategorizedPosition={uncategorizedPosition}
+					collapsed={collapsed}
+					effectiveColor={effectiveColor}
+					onToggleCollapse={toggleCollapse}
+					onMoveHabitInGroup={onMoveHabitInGroup}
+					onReorderCategories={onReorderCategories}
+					onEditHabit={onEditHabit}
+				/>
+			) : (
+				<FlatList
+					habits={habits}
+					effectiveColor={effectiveColor}
+					onReorderHabits={onReorderHabits}
+					onEditHabit={onEditHabit}
+				/>
+			)}
+
+			{archivedHabits.length > 0 && (
 				<div className="stratum-archived-section">
 					<button
 						className="stratum-archived-section__toggle"
 						onClick={() => setArchivedOpen((o) => !o)}
 					>
-						{archivedOpen ? '▾' : '▸'} Archived ({indexedArchived.length})
+						{archivedOpen ? '▾' : '▸'} Archived ({archivedHabits.length})
 					</button>
 					{archivedOpen && (
 						<ul className="stratum-habits__list">
-							{indexedArchived.map(({ habit, storeIndex }) =>
-								renderHabitRow(habit, storeIndex, false),
-							)}
+							{archivedHabits.map((habit) => (
+								<HabitRow
+									key={habit.id}
+									habit={habit}
+									color={effectiveColor(habit)}
+									draggable={false}
+									onEditHabit={onEditHabit}
+								/>
+							))}
 						</ul>
 					)}
 				</div>
 			)}
+		</div>
+	);
+}
+
+// --- Shared habit row ---
+
+interface HabitRowProps {
+	habit: Habit;
+	color: string | undefined;
+	draggable: boolean;
+	dropClass?: string;
+	onEditHabit: (id: string) => void;
+	onDragStart?: (e: DragEvent) => void;
+	onDragOver?: (e: DragEvent) => void;
+	onDrop?: (e: DragEvent) => void;
+	onDragEnd?: (e: DragEvent) => void;
+}
+
+function HabitRow({ habit, color, draggable, dropClass, onEditHabit, onDragStart, onDragOver, onDrop, onDragEnd }: HabitRowProps) {
+	const isActive = isHabitCurrentlyActive(habit);
+	return (
+		<li
+			className={`stratum-habit-item ${!isActive ? 'stratum-habit-item--archived' : ''} ${dropClass ?? ''}`}
+			draggable={draggable}
+			onDragStart={onDragStart}
+			onDragOver={onDragOver}
+			onDrop={onDrop}
+			onDragEnd={onDragEnd}
+		>
+			<span className="stratum-habit-item__drag-handle" style={draggable ? {} : { visibility: 'hidden' }}>⠿</span>
+			<span className="stratum-habit-item__name">
+				<span className="stratum-habit-item__dot" style={{ background: color ?? 'var(--text-faint)' }} />
+				{habit.name}
+			</span>
+			<button
+				className="stratum-habit-item__config"
+				onClick={() => onEditHabit(habit.id)}
+				title="Configure habit"
+			>⚙</button>
+		</li>
+	);
+}
+
+// --- Flat (ungrouped) list — original behavior ---
+
+interface FlatListProps {
+	habits: Habit[];
+	effectiveColor: (h: Habit) => string | undefined;
+	onReorderHabits: (fromIndex: number, toIndex: number) => void;
+	onEditHabit: (id: string) => void;
+}
+
+function FlatList({ habits, effectiveColor, onReorderHabits, onEditHabit }: FlatListProps) {
+	const [dropPosition, setDropPosition] = useState<number | null>(null);
+	const dragFromStoreIndex = useRef<number | null>(null);
+
+	const indexedActive = useMemo(
+		() => habits.map((h, i) => ({ habit: h, storeIndex: i })).filter(({ habit }) => isHabitCurrentlyActive(habit)),
+		[habits],
+	);
+
+	function storeIndexForDropPos(pos: number): number {
+		if (pos < indexedActive.length) return indexedActive[pos]!.storeIndex;
+		return habits.length;
+	}
+
+	function resolveVisualPos(e: DragEvent, displayIndex: number): number {
+		const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+		return e.clientY < rect.top + rect.height / 2 ? displayIndex : displayIndex + 1;
+	}
+
+	function onDrop(e: DragEvent, displayIndex: number) {
+		const visualPos = resolveVisualPos(e, displayIndex);
+		const storePos = storeIndexForDropPos(visualPos);
+		const fromStoreIdx = dragFromStoreIndex.current;
+		if (fromStoreIdx !== null) onReorderHabits(fromStoreIdx, storePos);
+		dragFromStoreIndex.current = null;
+		setDropPosition(null);
+	}
+
+	return (
+		<ul className="stratum-habits__list">
+			{indexedActive.map(({ habit, storeIndex }, displayIndex) => {
+				const isDropBefore = dropPosition === displayIndex;
+				const isDropAfter = dropPosition === indexedActive.length && displayIndex === indexedActive.length - 1;
+				return (
+					<HabitRow
+						key={habit.id}
+						habit={habit}
+						color={effectiveColor(habit)}
+						draggable
+						dropClass={`${isDropBefore ? 'stratum-habit-item--drop-before' : ''} ${isDropAfter ? 'stratum-habit-item--drop-after' : ''}`}
+						onEditHabit={onEditHabit}
+						onDragStart={() => { dragFromStoreIndex.current = storeIndex; }}
+						onDragOver={(e) => { e.preventDefault(); setDropPosition(resolveVisualPos(e, displayIndex)); }}
+						onDrop={(e) => onDrop(e, displayIndex)}
+						onDragEnd={() => { dragFromStoreIndex.current = null; setDropPosition(null); }}
+					/>
+				);
+			})}
+		</ul>
+	);
+}
+
+// --- Grouped list ---
+
+interface GroupedListProps {
+	activeHabits: Habit[];
+	sortedCategories: Category[];
+	uncategorizedPosition: 'top' | 'bottom';
+	collapsed: Set<string>;
+	effectiveColor: (h: Habit) => string | undefined;
+	onToggleCollapse: (key: string) => void;
+	onMoveHabitInGroup: (habitId: string, targetCategoryId: string | undefined, beforeHabitId: string | null) => void;
+	onReorderCategories: (fromCatId: string, toIndex: number) => void;
+	onEditHabit: (id: string) => void;
+}
+
+type HabitDrag = { kind: 'habit'; habitId: string };
+type CatDrag = { kind: 'category'; catId: string };
+type DragState = HabitDrag | CatDrag | null;
+
+// Where the drop indicator currently sits.
+type DropTarget =
+	| { type: 'habit'; categoryId: string | undefined; beforeHabitId: string | null }
+	| { type: 'category'; index: number }
+	| null;
+
+function GroupedList({
+	activeHabits, sortedCategories, uncategorizedPosition, collapsed,
+	effectiveColor, onToggleCollapse, onMoveHabitInGroup, onReorderCategories, onEditHabit,
+}: GroupedListProps) {
+	const drag = useRef<DragState>(null);
+	const [dropTarget, setDropTarget] = useState<DropTarget>(null);
+
+	const habitsByCat = useMemo(() => {
+		const map = new Map<string, Habit[]>();
+		map.set(UNCAT, []);
+		for (const c of sortedCategories) map.set(c.id, []);
+		for (const h of activeHabits) {
+			const key = h.categoryId ?? UNCAT;
+			if (!map.has(key)) map.set(key, []);
+			map.get(key)!.push(h);
+		}
+		return map;
+	}, [activeHabits, sortedCategories]);
+
+	const uncategorized = habitsByCat.get(UNCAT) ?? [];
+
+	function clearDrag() {
+		drag.current = null;
+		setDropTarget(null);
+	}
+
+	// --- Habit drop computation ---
+	function habitDropClass(habit: Habit, catId: string | undefined): string {
+		if (!dropTarget || dropTarget.type !== 'habit') return '';
+		const sameCat = (dropTarget.categoryId ?? UNCAT) === (catId ?? UNCAT);
+		if (!sameCat) return '';
+		if (dropTarget.beforeHabitId === habit.id) return 'stratum-habit-item--drop-before';
+		return '';
+	}
+
+	function onHabitDragOver(e: DragEvent, catId: string | undefined, habit: Habit, list: Habit[], index: number) {
+		if (!drag.current || drag.current.kind !== 'habit') return;
+		e.preventDefault();
+		e.stopPropagation();
+		const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+		const before = e.clientY < rect.top + rect.height / 2;
+		const beforeHabitId = before ? habit.id : (list[index + 1]?.id ?? null);
+		setDropTarget({ type: 'habit', categoryId: catId, beforeHabitId });
+	}
+
+	function onHabitDrop(e: DragEvent) {
+		e.preventDefault();
+		e.stopPropagation();
+		if (drag.current?.kind === 'habit' && dropTarget?.type === 'habit') {
+			onMoveHabitInGroup(drag.current.habitId, dropTarget.categoryId, dropTarget.beforeHabitId);
+		}
+		clearDrag();
+	}
+
+	// Dropping onto an (empty) category body appends to that category.
+	function onCategoryBodyDragOver(e: DragEvent, catId: string | undefined) {
+		if (!drag.current || drag.current.kind !== 'habit') return;
+		e.preventDefault();
+		setDropTarget({ type: 'habit', categoryId: catId, beforeHabitId: null });
+	}
+
+	// --- Category header drop computation ---
+	function onCatHeaderDragOver(e: DragEvent, index: number) {
+		if (!drag.current || drag.current.kind !== 'category') return;
+		e.preventDefault();
+		e.stopPropagation();
+		const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+		const before = e.clientY < rect.top + rect.height / 2;
+		setDropTarget({ type: 'category', index: before ? index : index + 1 });
+	}
+
+	function onCatHeaderDrop(e: DragEvent) {
+		e.preventDefault();
+		e.stopPropagation();
+		if (drag.current?.kind === 'category' && dropTarget?.type === 'category') {
+			onReorderCategories(drag.current.catId, dropTarget.index);
+		}
+		clearDrag();
+	}
+
+	function renderCategoryNest(cat: Category, index: number) {
+		const list = habitsByCat.get(cat.id) ?? [];
+		const isCollapsed = collapsed.has(cat.id);
+		const headerDropBefore = dropTarget?.type === 'category' && dropTarget.index === index;
+		const headerDropAfter = dropTarget?.type === 'category' && dropTarget.index === index + 1;
+		return (
+			<div className="stratum-cat-group" key={cat.id}>
+				<div
+					className={`stratum-cat-header ${headerDropBefore ? 'stratum-cat-header--drop-before' : ''} ${headerDropAfter ? 'stratum-cat-header--drop-after' : ''}`}
+					draggable
+					onDragStart={() => { drag.current = { kind: 'category', catId: cat.id }; }}
+					onDragOver={(e) => onCatHeaderDragOver(e, index)}
+					onDrop={onCatHeaderDrop}
+					onDragEnd={clearDrag}
+				>
+					<button
+						className="stratum-cat-header__toggle"
+						onClick={() => onToggleCollapse(cat.id)}
+						title={isCollapsed ? 'Expand' : 'Collapse'}
+					>
+						{isCollapsed ? '▸' : '▾'}
+					</button>
+					<span className="stratum-cat-header__dot" style={{ background: cat.color }} />
+					<span className="stratum-cat-header__name">{cat.name}</span>
+					<span className="stratum-cat-header__count">{list.length}</span>
+				</div>
+				{!isCollapsed && (
+					<ul
+						className="stratum-habits__list stratum-cat-group__body"
+						onDragOver={(e) => onCategoryBodyDragOver(e, cat.id)}
+						onDrop={onHabitDrop}
+					>
+						{list.map((habit, i) => (
+							<HabitRow
+								key={habit.id}
+								habit={habit}
+								color={effectiveColor(habit)}
+								draggable
+								dropClass={habitDropClass(habit, cat.id)}
+								onEditHabit={onEditHabit}
+								onDragStart={() => { drag.current = { kind: 'habit', habitId: habit.id }; }}
+								onDragOver={(e) => onHabitDragOver(e, cat.id, habit, list, i)}
+								onDrop={onHabitDrop}
+								onDragEnd={clearDrag}
+							/>
+						))}
+						{list.length === 0 && (
+							<li className="stratum-cat-group__empty">No habits</li>
+						)}
+					</ul>
+				)}
+			</div>
+		);
+	}
+
+	function renderUncategorized() {
+		if (uncategorized.length === 0) return null;
+		return (
+			<ul
+				className="stratum-habits__list stratum-uncat-group"
+				onDragOver={(e) => onCategoryBodyDragOver(e, undefined)}
+				onDrop={onHabitDrop}
+			>
+				{uncategorized.map((habit, i) => (
+					<HabitRow
+						key={habit.id}
+						habit={habit}
+						color={effectiveColor(habit)}
+						draggable
+						dropClass={habitDropClass(habit, undefined)}
+						onEditHabit={onEditHabit}
+						onDragStart={() => { drag.current = { kind: 'habit', habitId: habit.id }; }}
+						onDragOver={(e) => onHabitDragOver(e, undefined, habit, uncategorized, i)}
+						onDrop={onHabitDrop}
+						onDragEnd={clearDrag}
+					/>
+				))}
+			</ul>
+		);
+	}
+
+	return (
+		<div className="stratum-grouped">
+			{uncategorizedPosition === 'top' && renderUncategorized()}
+			{sortedCategories.map((cat, i) => renderCategoryNest(cat, i))}
+			{uncategorizedPosition === 'bottom' && renderUncategorized()}
 		</div>
 	);
 }

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type StratumPlugin from '../main';
 import type { HabitLog, PersistedStore } from '../types';
+import { normalizeGroupedHabits } from '../utils';
 import HabitConfigMenu from './HabitConfigMenu';
 import HabitHeatmap from './HabitHeatmap';
 import HabitMatrix from './HabitMatrix';
@@ -24,7 +25,17 @@ export default function App({ plugin }: AppProps) {
 	useEffect(() => {
 		void plugin.store.load().then(setStore);
 		plugin.onSettingsChange = () => {
-			setStore((prev) => prev ? { ...prev, settings: { ...prev.settings, ...plugin.settings } } : prev);
+			setStore((prev) => {
+				if (!prev) return prev;
+				const settings = { ...prev.settings, ...plugin.settings };
+				// Re-normalize so the matrix reflects grouping changes immediately.
+				const habits = settings.groupByCategory
+					? normalizeGroupedHabits(prev.data.habits, prev.data.categories, settings.uncategorizedPosition)
+					: prev.data.habits;
+				const next = { ...prev, settings, data: { ...prev.data, habits } };
+				void plugin.saveData(next);
+				return next;
+			});
 		};
 		return () => { plugin.onSettingsChange = undefined; };
 	}, []);
@@ -76,6 +87,10 @@ export default function App({ plugin }: AppProps) {
 		mutate((s) => plugin.store.renameHabit(s, id, name));
 	const onReorderHabits = (fromIndex: number, toIndex: number) =>
 		mutate((s) => plugin.store.reorderHabits(s, fromIndex, toIndex));
+	const onMoveHabitInGroup = (habitId: string, targetCategoryId: string | undefined, beforeHabitId: string | null) =>
+		mutate((s) => plugin.store.moveHabitInGroup(s, habitId, targetCategoryId, beforeHabitId, s.settings.uncategorizedPosition));
+	const onReorderCategories = (fromCatId: string, toIndex: number) =>
+		mutate((s) => plugin.store.reorderCategories(s, fromCatId, toIndex, s.settings.uncategorizedPosition));
 	const onSetHabitColor = (id: string, color?: string) =>
 		mutate((s) => plugin.store.setHabitColor(s, id, color));
 	const onSetHabitCategory = (id: string, categoryId?: string) =>
@@ -173,6 +188,10 @@ export default function App({ plugin }: AppProps) {
 					onSetHabitStartDate={onSetHabitStartDate}
 					skipDeleteConfirm={store.settings.skipDeleteConfirm}
 					onSetSkipDeleteConfirm={onSetSkipDeleteConfirm}
+					groupByCategory={store.settings.groupByCategory}
+					uncategorizedPosition={store.settings.uncategorizedPosition}
+					onMoveHabitInGroup={onMoveHabitInGroup}
+					onReorderCategories={onReorderCategories}
 				/>
 			</aside>
 		</div>

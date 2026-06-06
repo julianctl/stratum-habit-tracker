@@ -2,6 +2,7 @@ export interface Category {
 	id: string;
 	name: string;
 	color: string;
+	order: number; // display order in grouped mode; lower = higher in list
 }
 
 export interface HabitPeriod {
@@ -44,6 +45,8 @@ export interface StratumSettings {
 	matrixDays: number;
 	matrixColorScheme: 'stratum' | 'theme';
 	skipDeleteConfirm: boolean;
+	groupByCategory: boolean;
+	uncategorizedPosition: 'top' | 'bottom'; // where the no-category block sits in grouped mode
 }
 
 export interface PersistedStore {

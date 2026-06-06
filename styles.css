@@ -654,6 +654,96 @@
 	opacity: 0.55;
 }
 
+/* Grouped-by-category layout */
+.stratum-grouped {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+
+.stratum-cat-group {
+	display: flex;
+	flex-direction: column;
+}
+
+.stratum-cat-header {
+	display: flex;
+	align-items: center;
+	gap: 5px;
+	padding: 3px 2px;
+	border-radius: var(--radius-s);
+	cursor: grab;
+	border-top: 2px solid transparent;
+	border-bottom: 2px solid transparent;
+}
+
+.stratum-cat-header:hover {
+	background: var(--background-modifier-hover);
+}
+
+.stratum-cat-header--drop-before {
+	border-top-color: var(--interactive-accent);
+}
+
+.stratum-cat-header--drop-after {
+	border-bottom-color: var(--interactive-accent);
+}
+
+.stratum-cat-header__toggle {
+	background: none;
+	border: none;
+	color: var(--text-muted);
+	cursor: pointer;
+	font-size: 10px;
+	line-height: 1;
+	padding: 0 1px;
+	flex-shrink: 0;
+}
+
+.stratum-cat-header__toggle:hover {
+	color: var(--text-normal);
+}
+
+.stratum-cat-header__dot {
+	width: 9px;
+	height: 9px;
+	border-radius: 2px;
+	flex-shrink: 0;
+}
+
+.stratum-cat-header__name {
+	flex: 1;
+	font-size: var(--font-ui-small);
+	font-weight: 600;
+	color: var(--text-normal);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.stratum-cat-header__count {
+	font-size: var(--font-ui-smaller);
+	color: var(--text-faint);
+	flex-shrink: 0;
+}
+
+/* Nested habit list under a category */
+.stratum-cat-group__body {
+	padding-left: 14px;
+	min-height: 8px;
+}
+
+.stratum-cat-group__empty {
+	font-size: var(--font-ui-smaller);
+	color: var(--text-faint);
+	padding: 2px 0 2px 2px;
+	list-style: none;
+}
+
+.stratum-uncat-group {
+	padding-left: 2px;
+}
+
 .stratum-config-menu__archive-form {
 	display: flex;
 	flex-direction: column;

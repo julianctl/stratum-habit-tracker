@@ -11,6 +11,8 @@ const DEFAULT_SETTINGS: StratumSettings = {
 	matrixDays: 50,
 	matrixColorScheme: 'stratum',
 	skipDeleteConfirm: false,
+	groupByCategory: true,
+	uncategorizedPosition: 'bottom',
 };
 
 export default class StratumPlugin extends Plugin {

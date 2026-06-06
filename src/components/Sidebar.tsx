@@ -26,6 +26,10 @@ interface SidebarProps {
 	onSetHabitStartDate: (id: string, date: string) => void;
 	skipDeleteConfirm: boolean;
 	onSetSkipDeleteConfirm: (skip: boolean) => void;
+	groupByCategory: boolean;
+	uncategorizedPosition: 'top' | 'bottom';
+	onMoveHabitInGroup: (habitId: string, targetCategoryId: string | undefined, beforeHabitId: string | null) => void;
+	onReorderCategories: (fromCatId: string, toIndex: number) => void;
 }
 
 export default function Sidebar({
@@ -36,6 +40,7 @@ export default function Sidebar({
 	onSetHabitColor, onSetHabitCategory, onCreateCategory, onSetCategoryColor,
 	onArchiveHabit, onUnarchiveHabit, onSetHabitStartDate,
 	skipDeleteConfirm, onSetSkipDeleteConfirm,
+	groupByCategory, uncategorizedPosition, onMoveHabitInGroup, onReorderCategories,
 }: SidebarProps) {
 	const [configHabitId, setConfigHabitId] = useState<string | null>(null);
 
@@ -82,9 +87,13 @@ export default function Sidebar({
 			<HabitManager
 				habits={habits}
 				categories={categories}
+				groupByCategory={groupByCategory}
+				uncategorizedPosition={uncategorizedPosition}
 				onAddHabit={onAddHabit}
 				onDeleteHabit={onDeleteHabit}
 				onReorderHabits={onReorderHabits}
+				onMoveHabitInGroup={onMoveHabitInGroup}
+				onReorderCategories={onReorderCategories}
 				onEditHabit={setConfigHabitId}
 			/>
 		</div>

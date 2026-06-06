@@ -76,6 +76,35 @@ export class StratumSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
+			.setName('Group habits by category')
+			.setDesc('Nest habits under their category in the sidebar. Habits of the same category stay grouped in the matrix too. When off, habits are a single freely-ordered list.')
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.groupByCategory)
+					.onChange(async (value) => {
+						this.plugin.settings.groupByCategory = value;
+						await this.plugin.saveSettings();
+						this.display();
+					}),
+			);
+
+		if (this.plugin.settings.groupByCategory) {
+			new Setting(containerEl)
+				.setName('Uncategorized habits position')
+				.setDesc('Where habits without a category sit relative to the category groups.')
+				.addDropdown((drop) =>
+					drop
+						.addOption('bottom', 'Bottom')
+						.addOption('top', 'Top')
+						.setValue(this.plugin.settings.uncategorizedPosition)
+						.onChange(async (value: string) => {
+							this.plugin.settings.uncategorizedPosition = value as 'top' | 'bottom';
+							await this.plugin.saveSettings();
+						}),
+				);
+		}
+
+		new Setting(containerEl)
 			.setName('Delete confirmation')
 			.setDesc('Show a confirmation dialog before deleting a habit. Re-enable if you previously checked "Don\'t show this again".')
 			.addToggle((toggle) =>
