@@ -88,22 +88,6 @@ export class StratumSettingTab extends PluginSettingTab {
 					}),
 			);
 
-		if (this.plugin.settings.groupByCategory) {
-			new Setting(containerEl)
-				.setName('Uncategorized habits position')
-				.setDesc('Where habits without a category sit relative to the category groups.')
-				.addDropdown((drop) =>
-					drop
-						.addOption('bottom', 'Bottom')
-						.addOption('top', 'Top')
-						.setValue(this.plugin.settings.uncategorizedPosition)
-						.onChange(async (value: string) => {
-							this.plugin.settings.uncategorizedPosition = value as 'top' | 'bottom';
-							await this.plugin.saveSettings();
-						}),
-				);
-		}
-
 		new Setting(containerEl)
 			.setName('Delete confirmation')
 			.setDesc('Show a confirmation dialog before deleting a habit. Re-enable if you previously checked "Don\'t show this again".')

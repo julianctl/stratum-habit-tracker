@@ -30,7 +30,7 @@ export default function App({ plugin }: AppProps) {
 				const settings = { ...prev.settings, ...plugin.settings };
 				// Re-normalize so the matrix reflects grouping changes immediately.
 				const habits = settings.groupByCategory
-					? normalizeGroupedHabits(prev.data.habits, prev.data.categories, settings.uncategorizedPosition)
+					? normalizeGroupedHabits(prev.data.habits, prev.data.categories)
 					: prev.data.habits;
 				const next = { ...prev, settings, data: { ...prev.data, habits } };
 				void plugin.saveData(next);
@@ -88,9 +88,13 @@ export default function App({ plugin }: AppProps) {
 	const onReorderHabits = (fromIndex: number, toIndex: number) =>
 		mutate((s) => plugin.store.reorderHabits(s, fromIndex, toIndex));
 	const onMoveHabitInGroup = (habitId: string, targetCategoryId: string | undefined, beforeHabitId: string | null) =>
-		mutate((s) => plugin.store.moveHabitInGroup(s, habitId, targetCategoryId, beforeHabitId, s.settings.uncategorizedPosition));
+		mutate((s) => plugin.store.moveHabitInGroup(s, habitId, targetCategoryId, beforeHabitId));
 	const onReorderCategories = (fromCatId: string, toIndex: number) =>
-		mutate((s) => plugin.store.reorderCategories(s, fromCatId, toIndex, s.settings.uncategorizedPosition));
+		mutate((s) => plugin.store.reorderCategories(s, fromCatId, toIndex));
+	const onRenameCategory = (categoryId: string, name: string) =>
+		mutate((s) => plugin.store.renameCategory(s, categoryId, name));
+	const onAddHabitToCategory = (name: string, categoryId: string) =>
+		mutate((s) => plugin.store.addHabitToCategory(s, name, categoryId));
 	const onSetHabitColor = (id: string, color?: string) =>
 		mutate((s) => plugin.store.setHabitColor(s, id, color));
 	const onSetHabitCategory = (id: string, categoryId?: string) =>
@@ -189,9 +193,10 @@ export default function App({ plugin }: AppProps) {
 					skipDeleteConfirm={store.settings.skipDeleteConfirm}
 					onSetSkipDeleteConfirm={onSetSkipDeleteConfirm}
 					groupByCategory={store.settings.groupByCategory}
-					uncategorizedPosition={store.settings.uncategorizedPosition}
 					onMoveHabitInGroup={onMoveHabitInGroup}
 					onReorderCategories={onReorderCategories}
+					onRenameCategory={onRenameCategory}
+					onAddHabitToCategory={onAddHabitToCategory}
 				/>
 			</aside>
 		</div>

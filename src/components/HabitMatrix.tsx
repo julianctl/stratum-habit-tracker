@@ -184,7 +184,6 @@ export default function HabitMatrix({ habits, categories, logMap, monthDays, def
 									return (
 										<MatrixCell
 											key={key}
-											habitId={habit.id}
 											date={date}
 											isCompleted={!!log}
 											hasNote={!!log?.note}

@@ -21,22 +21,15 @@ function groupKey(habit: Habit): string {
 }
 
 // Returns the list of group keys (category ids + UNCAT) in their display order.
-export function groupOrder(
-	categories: Category[],
-	uncategorizedPosition: 'top' | 'bottom',
-): string[] {
-	const cats = [...categories].sort((a, b) => a.order - b.order).map((c) => c.id);
-	return uncategorizedPosition === 'top' ? [UNCAT, ...cats] : [...cats, UNCAT];
+// Uncategorized is always anchored at the bottom.
+export function groupOrder(categories: Category[]): string[] {
+	return [...categories].sort((a, b) => a.order - b.order).map((c) => c.id).concat(UNCAT);
 }
 
 // Re-sort habits[] to satisfy the grouped invariant, preserving each habit's
 // current relative order within its own group. Stable.
-export function normalizeGroupedHabits(
-	habits: Habit[],
-	categories: Category[],
-	uncategorizedPosition: 'top' | 'bottom',
-): Habit[] {
-	const order = groupOrder(categories, uncategorizedPosition);
+export function normalizeGroupedHabits(habits: Habit[], categories: Category[]): Habit[] {
+	const order = groupOrder(categories);
 	const rank = new Map(order.map((key, i) => [key, i]));
 	// Decorate with original index for a stable sort within groups.
 	return habits

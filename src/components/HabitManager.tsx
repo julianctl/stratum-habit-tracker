@@ -1,26 +1,27 @@
 import { useMemo, useRef, useState, type DragEvent } from 'react';
 import type { Category, Habit } from '../types';
-import { isHabitCurrentlyActive } from '../utils';
+import { isHabitCurrentlyActive, UNCATEGORIZED_KEY as UNCAT } from '../utils';
 
 interface HabitManagerProps {
 	habits: Habit[];
 	categories: Category[];
 	groupByCategory: boolean;
-	uncategorizedPosition: 'top' | 'bottom';
 	onAddHabit: (name: string, color?: string) => void;
+	onAddHabitToCategory: (name: string, categoryId: string) => void;
 	onDeleteHabit: (id: string) => void;
 	onReorderHabits: (fromIndex: number, toIndex: number) => void;
 	onMoveHabitInGroup: (habitId: string, targetCategoryId: string | undefined, beforeHabitId: string | null) => void;
 	onReorderCategories: (fromCatId: string, toIndex: number) => void;
+	onRenameCategory: (categoryId: string, name: string) => void;
+	onSetCategoryColor: (categoryId: string, color: string) => void;
 	onEditHabit: (habitId: string) => void;
 }
 
-const UNCAT = '__uncat__';
 
 export default function HabitManager({
 	habits, categories,
-	groupByCategory, uncategorizedPosition,
-	onAddHabit, onDeleteHabit, onReorderHabits, onMoveHabitInGroup, onReorderCategories, onEditHabit,
+	groupByCategory,
+	onAddHabit, onAddHabitToCategory, onDeleteHabit, onReorderHabits, onMoveHabitInGroup, onReorderCategories, onRenameCategory, onSetCategoryColor, onEditHabit,
 }: HabitManagerProps) {
 	const [input, setInput] = useState('');
 	const [archivedOpen, setArchivedOpen] = useState(false);
@@ -59,28 +60,33 @@ export default function HabitManager({
 	return (
 		<div className="stratum-habit-manager">
 			<h3 className="stratum-section-title">Habits</h3>
-			<div className="stratum-todos__input-row">
-				<input
-					type="text"
-					value={input}
-					onChange={(e) => setInput(e.target.value)}
-					onKeyDown={(e) => { if (e.key === 'Enter') submitAdd(); }}
-					placeholder="New habit..."
-					className="stratum-input"
-				/>
-				<button className="stratum-btn" onClick={submitAdd}>+</button>
-			</div>
+			{!groupByCategory && (
+				<div className="stratum-todos__input-row">
+					<input
+						type="text"
+						value={input}
+						onChange={(e) => setInput(e.target.value)}
+						onKeyDown={(e) => { if (e.key === 'Enter') submitAdd(); }}
+						placeholder="New habit..."
+						className="stratum-input"
+					/>
+					<button className="stratum-btn" onClick={submitAdd}>+</button>
+				</div>
+			)}
 
 			{groupByCategory ? (
 				<GroupedList
 					activeHabits={activeHabits}
 					sortedCategories={sortedCategories}
-					uncategorizedPosition={uncategorizedPosition}
 					collapsed={collapsed}
 					effectiveColor={effectiveColor}
 					onToggleCollapse={toggleCollapse}
+					onAddHabit={onAddHabit}
+					onAddHabitToCategory={onAddHabitToCategory}
+					onSetCategoryColor={onSetCategoryColor}
 					onMoveHabitInGroup={onMoveHabitInGroup}
 					onReorderCategories={onReorderCategories}
+					onRenameCategory={onRenameCategory}
 					onEditHabit={onEditHabit}
 				/>
 			) : (
@@ -224,12 +230,15 @@ function FlatList({ habits, effectiveColor, onReorderHabits, onEditHabit }: Flat
 interface GroupedListProps {
 	activeHabits: Habit[];
 	sortedCategories: Category[];
-	uncategorizedPosition: 'top' | 'bottom';
 	collapsed: Set<string>;
 	effectiveColor: (h: Habit) => string | undefined;
 	onToggleCollapse: (key: string) => void;
+	onAddHabit: (name: string) => void;
+	onAddHabitToCategory: (name: string, categoryId: string) => void;
+	onSetCategoryColor: (categoryId: string, color: string) => void;
 	onMoveHabitInGroup: (habitId: string, targetCategoryId: string | undefined, beforeHabitId: string | null) => void;
 	onReorderCategories: (fromCatId: string, toIndex: number) => void;
+	onRenameCategory: (categoryId: string, name: string) => void;
 	onEditHabit: (id: string) => void;
 }
 
@@ -244,11 +253,51 @@ type DropTarget =
 	| null;
 
 function GroupedList({
-	activeHabits, sortedCategories, uncategorizedPosition, collapsed,
-	effectiveColor, onToggleCollapse, onMoveHabitInGroup, onReorderCategories, onEditHabit,
+	activeHabits, sortedCategories, collapsed,
+	effectiveColor, onToggleCollapse, onAddHabit, onAddHabitToCategory, onSetCategoryColor, onMoveHabitInGroup, onReorderCategories, onRenameCategory, onEditHabit,
 }: GroupedListProps) {
 	const drag = useRef<DragState>(null);
 	const [dropTarget, setDropTarget] = useState<DropTarget>(null);
+	// categoryId → draft name while editing; null = not editing
+	const [renamingId, setRenamingId] = useState<string | null>(null);
+	const [renameDraft, setRenameDraft] = useState('');
+	// categoryId → pending new habit name (empty string = showing input)
+	const [addingTo, setAddingTo] = useState<string | null>(null);
+	const [addDraft, setAddDraft] = useState('');
+	const [addingUncat, setAddingUncat] = useState(false);
+	const [addUncatDraft, setAddUncatDraft] = useState('');
+
+	function commitAddUncat() {
+		const trimmed = addUncatDraft.trim();
+		if (trimmed) onAddHabit(trimmed);
+		setAddingUncat(false);
+		setAddUncatDraft('');
+	}
+
+	function startRename(cat: Category) {
+		setRenamingId(cat.id);
+		setRenameDraft(cat.name);
+	}
+
+	function commitRename(catId: string) {
+		const trimmed = renameDraft.trim();
+		if (trimmed && trimmed !== sortedCategories.find((c) => c.id === catId)?.name) {
+			onRenameCategory(catId, trimmed);
+		}
+		setRenamingId(null);
+	}
+
+	function startAdd(catId: string) {
+		setAddingTo(catId);
+		setAddDraft('');
+	}
+
+	function commitAdd(catId: string) {
+		const trimmed = addDraft.trim();
+		if (trimmed) onAddHabitToCategory(trimmed, catId);
+		setAddingTo(null);
+		setAddDraft('');
+	}
 
 	const habitsByCat = useMemo(() => {
 		const map = new Map<string, Habit[]>();
@@ -326,14 +375,16 @@ function GroupedList({
 	function renderCategoryNest(cat: Category, index: number) {
 		const list = habitsByCat.get(cat.id) ?? [];
 		const isCollapsed = collapsed.has(cat.id);
+		const isRenaming = renamingId === cat.id;
+		const isAdding = addingTo === cat.id;
 		const headerDropBefore = dropTarget?.type === 'category' && dropTarget.index === index;
 		const headerDropAfter = dropTarget?.type === 'category' && dropTarget.index === index + 1;
 		return (
 			<div className="stratum-cat-group" key={cat.id}>
 				<div
 					className={`stratum-cat-header ${headerDropBefore ? 'stratum-cat-header--drop-before' : ''} ${headerDropAfter ? 'stratum-cat-header--drop-after' : ''}`}
-					draggable
-					onDragStart={() => { drag.current = { kind: 'category', catId: cat.id }; }}
+					draggable={!isRenaming}
+					onDragStart={() => { if (!isRenaming) drag.current = { kind: 'category', catId: cat.id }; }}
 					onDragOver={(e) => onCatHeaderDragOver(e, index)}
 					onDrop={onCatHeaderDrop}
 					onDragEnd={clearDrag}
@@ -345,9 +396,46 @@ function GroupedList({
 					>
 						{isCollapsed ? '▸' : '▾'}
 					</button>
-					<span className="stratum-cat-header__dot" style={{ background: cat.color }} />
-					<span className="stratum-cat-header__name">{cat.name}</span>
-					<span className="stratum-cat-header__count">{list.length}</span>
+					{isRenaming ? (
+						<input
+							className="stratum-cat-header__rename-input"
+							value={renameDraft}
+							autoFocus
+							onChange={(e) => setRenameDraft(e.target.value)}
+							onBlur={() => commitRename(cat.id)}
+							onKeyDown={(e) => {
+								if (e.key === 'Enter') { e.preventDefault(); commitRename(cat.id); }
+								if (e.key === 'Escape') { e.preventDefault(); setRenamingId(null); }
+							}}
+						/>
+					) : (
+						<>
+							<label
+								className="stratum-cat-header__dot-label"
+								title="Change category color"
+								style={{ background: cat.color }}
+							>
+								<input
+									type="color"
+									className="stratum-cat-header__color-input"
+									value={cat.color}
+									onChange={(e) => onSetCategoryColor(cat.id, e.target.value)}
+								/>
+							</label>
+							<span
+								className="stratum-cat-header__name"
+								onClick={() => startRename(cat)}
+								title="Rename category"
+							>
+								{cat.name}
+							</span>
+						</>
+					)}
+					<button
+						className="stratum-cat-header__add"
+						onClick={() => { if (!isAdding) startAdd(cat.id); }}
+						title="Add habit to category"
+					>+</button>
 				</div>
 				{!isCollapsed && (
 					<ul
@@ -369,7 +457,23 @@ function GroupedList({
 								onDragEnd={clearDrag}
 							/>
 						))}
-						{list.length === 0 && (
+						{isAdding && (
+							<li className="stratum-habit-item stratum-habit-item--new">
+								<input
+									className="stratum-input stratum-habit-item__new-input"
+									value={addDraft}
+									autoFocus
+									placeholder="New habit..."
+									onChange={(e) => setAddDraft(e.target.value)}
+									onBlur={() => commitAdd(cat.id)}
+									onKeyDown={(e) => {
+										if (e.key === 'Enter') { e.preventDefault(); commitAdd(cat.id); }
+										if (e.key === 'Escape') { e.preventDefault(); setAddingTo(null); setAddDraft(''); }
+									}}
+								/>
+							</li>
+						)}
+						{list.length === 0 && !isAdding && (
 							<li className="stratum-cat-group__empty">No habits</li>
 						)}
 					</ul>
@@ -379,36 +483,73 @@ function GroupedList({
 	}
 
 	function renderUncategorized() {
-		if (uncategorized.length === 0) return null;
+		const isCollapsed = collapsed.has(UNCAT);
 		return (
-			<ul
-				className="stratum-habits__list stratum-uncat-group"
-				onDragOver={(e) => onCategoryBodyDragOver(e, undefined)}
-				onDrop={onHabitDrop}
-			>
-				{uncategorized.map((habit, i) => (
-					<HabitRow
-						key={habit.id}
-						habit={habit}
-						color={effectiveColor(habit)}
-						draggable
-						dropClass={habitDropClass(habit, undefined)}
-						onEditHabit={onEditHabit}
-						onDragStart={() => { drag.current = { kind: 'habit', habitId: habit.id }; }}
-						onDragOver={(e) => onHabitDragOver(e, undefined, habit, uncategorized, i)}
+			<div className="stratum-cat-group stratum-cat-group--uncat">
+				<div className="stratum-cat-header stratum-cat-header--uncat">
+					<button
+						className="stratum-cat-header__toggle"
+						onClick={() => onToggleCollapse(UNCAT)}
+						title={isCollapsed ? 'Expand' : 'Collapse'}
+					>
+						{isCollapsed ? '▸' : '▾'}
+					</button>
+					<span className="stratum-cat-header__name stratum-cat-header__name--uncat">Uncategorized</span>
+					<button
+						className="stratum-cat-header__add"
+						onClick={() => { if (!addingUncat) { setAddingUncat(true); setAddUncatDraft(''); } }}
+						title="Add uncategorized habit"
+					>+</button>
+				</div>
+				{!isCollapsed && (
+					<ul
+						className="stratum-habits__list stratum-cat-group__body"
+						onDragOver={(e) => onCategoryBodyDragOver(e, undefined)}
 						onDrop={onHabitDrop}
-						onDragEnd={clearDrag}
-					/>
-				))}
-			</ul>
+					>
+						{uncategorized.map((habit, i) => (
+							<HabitRow
+								key={habit.id}
+								habit={habit}
+								color={effectiveColor(habit)}
+								draggable
+								dropClass={habitDropClass(habit, undefined)}
+								onEditHabit={onEditHabit}
+								onDragStart={() => { drag.current = { kind: 'habit', habitId: habit.id }; }}
+								onDragOver={(e) => onHabitDragOver(e, undefined, habit, uncategorized, i)}
+								onDrop={onHabitDrop}
+								onDragEnd={clearDrag}
+							/>
+						))}
+						{addingUncat && (
+							<li className="stratum-habit-item stratum-habit-item--new">
+								<input
+									className="stratum-input stratum-habit-item__new-input"
+									value={addUncatDraft}
+									autoFocus
+									placeholder="New habit..."
+									onChange={(e) => setAddUncatDraft(e.target.value)}
+									onBlur={commitAddUncat}
+									onKeyDown={(e) => {
+										if (e.key === 'Enter') { e.preventDefault(); commitAddUncat(); }
+										if (e.key === 'Escape') { e.preventDefault(); setAddingUncat(false); setAddUncatDraft(''); }
+									}}
+								/>
+							</li>
+						)}
+						{uncategorized.length === 0 && !addingUncat && (
+							<li className="stratum-cat-group__empty">No habits</li>
+						)}
+					</ul>
+				)}
+			</div>
 		);
 	}
 
 	return (
 		<div className="stratum-grouped">
-			{uncategorizedPosition === 'top' && renderUncategorized()}
 			{sortedCategories.map((cat, i) => renderCategoryNest(cat, i))}
-			{uncategorizedPosition === 'bottom' && renderUncategorized()}
+			{renderUncategorized()}
 		</div>
 	);
 }

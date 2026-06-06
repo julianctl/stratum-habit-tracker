@@ -1,7 +1,6 @@
 import { useRef, useState, type MouseEvent } from 'react';
 
 interface MatrixCellProps {
-	habitId: string;
 	date: string;
 	isCompleted: boolean;
 	hasNote: boolean;

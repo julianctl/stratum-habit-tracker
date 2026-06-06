@@ -1,6 +1,6 @@
 {
 	"name": "stratum-habit-tracker",
-	"version": "1.0.0",
+	"version": "0.2.0",
 	"description": "A habit tracking dashboard built into Obsidian, with a calendar heatmap, date matrix, daily logging, to-do list, and daily notes.",
 	"author": "julianctl",
 	"main": "main.js",

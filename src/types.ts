@@ -46,7 +46,6 @@ export interface StratumSettings {
 	matrixColorScheme: 'stratum' | 'theme';
 	skipDeleteConfirm: boolean;
 	groupByCategory: boolean;
-	uncategorizedPosition: 'top' | 'bottom'; // where the no-category block sits in grouped mode
 }
 
 export interface PersistedStore {

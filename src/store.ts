@@ -43,12 +43,11 @@ export class StratumStore {
 			matrixColorScheme: raw?.settings?.matrixColorScheme ?? 'stratum',
 			skipDeleteConfirm: raw?.settings?.skipDeleteConfirm ?? false,
 			groupByCategory: raw?.settings?.groupByCategory ?? true,
-			uncategorizedPosition: raw?.settings?.uncategorizedPosition ?? 'bottom',
 		} as const;
 		// When grouping is on, ensure the stored array already satisfies the
 		// grouped invariant (handles first-enable and external edits).
 		const orderedHabits = settings.groupByCategory
-			? normalizeGroupedHabits(habits, categories, settings.uncategorizedPosition)
+			? normalizeGroupedHabits(habits, categories)
 			: habits;
 		return {
 			settings,
@@ -76,7 +75,7 @@ export class StratumStore {
 	}
 
 	async deleteHabit(store: PersistedStore, id: string): Promise<PersistedStore> {
-		const next = {
+		const withDeletion = {
 			...store,
 			data: {
 				...store.data,
@@ -84,6 +83,7 @@ export class StratumStore {
 				logs: store.data.logs.filter((l) => l.habitId !== id),
 			},
 		};
+		const next = this.pruneEmptyCategories(withDeletion);
 		await this.save(next);
 		return next;
 	}
@@ -128,9 +128,9 @@ export class StratumStore {
 
 	// When grouping is on, keep the flat array satisfying the grouped invariant so
 	// the matrix (which reads habits[] directly) stays correctly grouped.
-	private maybeRegroup(store: PersistedStore, habits: Habit[]): Habit[] {
+	private maybeRegroup(store: PersistedStore, habits: Habit[], categories?: Category[]): Habit[] {
 		if (!store.settings.groupByCategory) return habits;
-		return normalizeGroupedHabits(habits, store.data.categories, store.settings.uncategorizedPosition);
+		return normalizeGroupedHabits(habits, categories ?? store.data.categories);
 	}
 
 	// --- Categories ---
@@ -148,7 +148,7 @@ export class StratumStore {
 			h.id === habitId ? { ...h, categoryId: category.id } : h,
 		);
 		const habits = store.settings.groupByCategory
-			? normalizeGroupedHabits(reassigned, categories, store.settings.uncategorizedPosition)
+			? normalizeGroupedHabits(reassigned, categories)
 			: reassigned;
 		const next = {
 			...store,
@@ -156,6 +156,39 @@ export class StratumStore {
 		};
 		await this.save(next);
 		return next;
+	}
+
+	async renameCategory(store: PersistedStore, categoryId: string, name: string): Promise<PersistedStore> {
+		const next = {
+			...store,
+			data: {
+				...store.data,
+				categories: store.data.categories.map((c) =>
+					c.id === categoryId ? { ...c, name } : c,
+				),
+			},
+		};
+		await this.save(next);
+		return next;
+	}
+
+	// Create a habit directly assigned to a category (grouped mode + button).
+	async addHabitToCategory(store: PersistedStore, name: string, categoryId: string): Promise<PersistedStore> {
+		const habit: Habit = { id: Date.now().toString(), name, categoryId, periods: [{ startDate: todayISO() }] };
+		const habits = this.maybeRegroup(store, [...store.data.habits, habit]);
+		const next = { ...store, data: { ...store.data, habits } };
+		await this.save(next);
+		return next;
+	}
+
+	// Remove categories that no longer have any habits assigned (active or archived).
+	private pruneEmptyCategories(store: PersistedStore): PersistedStore {
+		const usedIds = new Set(store.data.habits.map((h) => h.categoryId).filter(Boolean));
+		const categories = store.data.categories.filter((c) => usedIds.has(c.id));
+		if (categories.length === store.data.categories.length) return store;
+		// Re-assign compact order values after removal.
+		const pruned = categories.map((c, i) => ({ ...c, order: i }));
+		return { ...store, data: { ...store.data, categories: pruned } };
 	}
 
 	async setCategoryColor(store: PersistedStore, categoryId: string, color: string): Promise<PersistedStore> {
@@ -181,7 +214,6 @@ export class StratumStore {
 		store: PersistedStore,
 		fromCatId: string,
 		toIndex: number,
-		uncategorizedPosition: 'top' | 'bottom',
 	): Promise<PersistedStore> {
 		const sorted = [...store.data.categories].sort((a, b) => a.order - b.order);
 		const fromIndex = sorted.findIndex((c) => c.id === fromCatId);
@@ -192,7 +224,7 @@ export class StratumStore {
 		const insertAt = toIndex > fromIndex ? toIndex - 1 : toIndex;
 		sorted.splice(insertAt, 0, moved);
 		const categories: Category[] = sorted.map((c, i) => ({ ...c, order: i }));
-		const habits = normalizeGroupedHabits(store.data.habits, categories, uncategorizedPosition);
+		const habits = normalizeGroupedHabits(store.data.habits, categories);
 		const next = { ...store, data: { ...store.data, categories, habits } };
 		await this.save(next);
 		return next;
@@ -206,7 +238,6 @@ export class StratumStore {
 		habitId: string,
 		targetCategoryId: string | undefined,
 		beforeHabitId: string | null,
-		uncategorizedPosition: 'top' | 'bottom',
 	): Promise<PersistedStore> {
 		const original = store.data.habits;
 		const moving = original.find((h) => h.id === habitId);
@@ -249,8 +280,9 @@ export class StratumStore {
 		});
 		if (!emittedGroup) emitGroup(); // safety: group had no trigger slot
 
-		const normalized = normalizeGroupedHabits(result, store.data.categories, uncategorizedPosition);
-		const next = { ...store, data: { ...store.data, habits: normalized } };
+		const normalized = normalizeGroupedHabits(result, store.data.categories);
+		const withMove = { ...store, data: { ...store.data, habits: normalized } };
+		const next = this.pruneEmptyCategories(withMove);
 		await this.save(next);
 		return next;
 	}
