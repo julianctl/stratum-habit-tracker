@@ -82,7 +82,7 @@ export default function App({ plugin }: AppProps) {
 	const onAddHabit = (name: string, color?: string) =>
 		mutate((s) => plugin.store.addHabit(s, name, color));
 	const onQuickAddHabit = async (): Promise<string> => {
-		const next = await plugin.store.addHabit(store!, 'New habit');
+		const next = await plugin.store.addHabit(store, 'New habit');
 		setStore(next);
 		return next.data.habits[next.data.habits.length - 1]!.id;
 	};
@@ -233,7 +233,7 @@ export default function App({ plugin }: AppProps) {
 						onClose={() => setFloatingMenu(null)}
 					/>
 				</>,
-				document.body,
+				activeDocument.body,
 			);
 		})()}
 		</>

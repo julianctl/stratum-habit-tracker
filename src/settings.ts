@@ -90,7 +90,7 @@ export class StratumSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName('Delete confirmation')
-			.setDesc('Show a confirmation dialog before deleting a habit. Re-enable if you previously checked "Don\'t show this again".')
+			.setDesc('Show a confirmation dialog before deleting a habit. Re-enable if you previously checked "don\'t show this again".')
 			.addToggle((toggle) =>
 				toggle
 					.setValue(!this.plugin.settings.skipDeleteConfirm)

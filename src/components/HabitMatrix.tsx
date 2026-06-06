@@ -254,7 +254,7 @@ export default function HabitMatrix({ habits, categories, logMap, monthDays, def
 					<span className="stratum-cell__note-hint">ESC to cancel · Enter to save</span>
 				</div>
 			</>,
-			document.body,
+			activeDocument.body,
 		)}
 		</>
 	);

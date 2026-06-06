@@ -86,7 +86,6 @@ export default function HabitManager({
 					effectiveColor={effectiveColor}
 					onToggleCollapse={toggleCollapse}
 					onAddHabit={onAddHabit}
-					onAddHabitToCategory={onAddHabitToCategory}
 					onSetCategoryColor={onSetCategoryColor}
 					onMoveHabitInGroup={onMoveHabitInGroup}
 					onReorderCategories={onReorderCategories}
@@ -244,7 +243,6 @@ interface GroupedListProps {
 	effectiveColor: (h: Habit) => string | undefined;
 	onToggleCollapse: (key: string) => void;
 	onAddHabit: (name: string) => void;
-	onAddHabitToCategory: (name: string, categoryId: string) => void;
 	onSetCategoryColor: (categoryId: string, color: string) => void;
 	onMoveHabitInGroup: (habitId: string, targetCategoryId: string | undefined, beforeHabitId: string | null) => void;
 	onReorderCategories: (fromCatId: string, toIndex: number) => void;
@@ -264,7 +262,7 @@ type DropTarget =
 
 function GroupedList({
 	activeHabits, sortedCategories, collapsed,
-	effectiveColor, onToggleCollapse, onAddHabit, onAddHabitToCategory, onSetCategoryColor, onMoveHabitInGroup, onReorderCategories, onRenameCategory, onEditHabit,
+	effectiveColor, onToggleCollapse, onAddHabit, onSetCategoryColor, onMoveHabitInGroup, onReorderCategories, onRenameCategory, onEditHabit,
 }: GroupedListProps) {
 	const drag = useRef<DragState>(null);
 	const [dropTarget, setDropTarget] = useState<DropTarget>(null);
@@ -272,9 +270,6 @@ function GroupedList({
 	const [renamingId, setRenamingId] = useState<string | null>(null);
 	const [renameDraft, setRenameDraft] = useState('');
 	// categoryId → pending new habit name (empty string = showing input)
-	const [addingTo, setAddingTo] = useState<string | null>(null);
-	const [addDraft, setAddDraft] = useState('');
-
 	function startRename(cat: Category) {
 		setRenamingId(cat.id);
 		setRenameDraft(cat.name);
@@ -286,18 +281,6 @@ function GroupedList({
 			onRenameCategory(catId, trimmed);
 		}
 		setRenamingId(null);
-	}
-
-	function startAdd(catId: string) {
-		setAddingTo(catId);
-		setAddDraft('');
-	}
-
-	function commitAdd(catId: string) {
-		const trimmed = addDraft.trim();
-		if (trimmed) onAddHabitToCategory(trimmed, catId);
-		setAddingTo(null);
-		setAddDraft('');
 	}
 
 	const habitsByCat = useMemo(() => {
@@ -377,7 +360,6 @@ function GroupedList({
 		const list = habitsByCat.get(cat.id) ?? [];
 		const isCollapsed = collapsed.has(cat.id);
 		const isRenaming = renamingId === cat.id;
-		const isAdding = addingTo === cat.id;
 		const headerDropBefore = dropTarget?.type === 'category' && dropTarget.index === index;
 		const headerDropAfter = dropTarget?.type === 'category' && dropTarget.index === index + 1;
 		return (
@@ -454,22 +436,6 @@ function GroupedList({
 								onDragEnd={clearDrag}
 							/>
 						))}
-						{isAdding && (
-							<li className="stratum-habit-item stratum-habit-item--new">
-								<input
-									className="stratum-input stratum-habit-item__new-input"
-									value={addDraft}
-									autoFocus
-									placeholder="New habit..."
-									onChange={(e) => setAddDraft(e.target.value)}
-									onBlur={() => commitAdd(cat.id)}
-									onKeyDown={(e) => {
-										if (e.key === 'Enter') { e.preventDefault(); commitAdd(cat.id); }
-										if (e.key === 'Escape') { e.preventDefault(); setAddingTo(null); setAddDraft(''); }
-									}}
-								/>
-							</li>
-						)}
 					</ul>
 				)}
 			</div>

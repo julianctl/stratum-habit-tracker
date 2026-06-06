@@ -109,7 +109,7 @@ export default function Sidebar({
 				onRenameCategory={onRenameCategory}
 				onSetCategoryColor={onSetCategoryColor}
 				onEditHabit={setConfigHabitId}
-				onQuickAddHabit={handleQuickAdd}
+				onQuickAddHabit={() => { void handleQuickAdd(); }}
 			/>
 		</div>
 	);

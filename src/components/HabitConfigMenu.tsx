@@ -71,8 +71,8 @@ export default function HabitConfigMenu({
 
 	useEffect(() => {
 		const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-		document.addEventListener('keydown', handler);
-		return () => document.removeEventListener('keydown', handler);
+		activeDocument.addEventListener('keydown', handler);
+		return () => activeDocument.removeEventListener('keydown', handler);
 	}, [onClose]);
 
 	const isActive = isHabitCurrentlyActive(habit);
