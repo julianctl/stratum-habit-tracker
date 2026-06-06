@@ -24,6 +24,8 @@ interface SidebarProps {
 	onArchiveHabit: (id: string, endDate: string) => void;
 	onUnarchiveHabit: (id: string, startDate: string) => void;
 	onSetHabitStartDate: (id: string, date: string) => void;
+	skipDeleteConfirm: boolean;
+	onSetSkipDeleteConfirm: (skip: boolean) => void;
 }
 
 export default function Sidebar({
@@ -33,6 +35,7 @@ export default function Sidebar({
 	onAddHabit, onDeleteHabit, onRenameHabit, onReorderHabits,
 	onSetHabitColor, onSetHabitCategory, onCreateCategory, onSetCategoryColor,
 	onArchiveHabit, onUnarchiveHabit, onSetHabitStartDate,
+	skipDeleteConfirm, onSetSkipDeleteConfirm,
 }: SidebarProps) {
 	const [configHabitId, setConfigHabitId] = useState<string | null>(null);
 
@@ -42,8 +45,8 @@ export default function Sidebar({
 		if (habit) {
 			return (
 				<div className="stratum-sidebar-content">
-					<button className="stratum-sidebar-back" onClick={() => setConfigHabitId(null)}>
-						← Back
+					<button className="stratum-sidebar-back" onClick={() => setConfigHabitId(null)} title="Back">
+						←
 					</button>
 					<HabitConfigMenu
 						extraClass="stratum-config-menu--sidebar-page"
@@ -57,6 +60,9 @@ export default function Sidebar({
 						onArchive={(endDate) => { onArchiveHabit(habit.id, endDate); setConfigHabitId(null); }}
 						onUnarchive={(startDate) => { onUnarchiveHabit(habit.id, startDate); setConfigHabitId(null); }}
 						onSetStartDate={(date) => onSetHabitStartDate(habit.id, date)}
+						skipDeleteConfirm={skipDeleteConfirm}
+						onDelete={() => { onDeleteHabit(habit.id); setConfigHabitId(null); }}
+						onSetSkipDeleteConfirm={onSetSkipDeleteConfirm}
 						onClose={() => setConfigHabitId(null)}
 					/>
 				</div>

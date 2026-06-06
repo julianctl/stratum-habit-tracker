@@ -463,21 +463,25 @@
 }
 
 .stratum-habit-item__config {
-	background: none;
+	background: none !important;
 	border: none;
+	border-radius: var(--radius-s);
 	color: var(--text-muted);
 	cursor: pointer;
 	font-size: 12px;
 	line-height: 1;
-	padding: 0 2px;
+	padding: 2px 3px;
+	transition: background 0.1s, color 0.1s;
 }
 
 .stratum-habit-item__config:hover {
+	background: var(--interactive-hover);
 	color: var(--text-normal);
 }
 
 /* Habit config menu (popover) */
 .stratum-config-menu {
+	position: relative;
 	width: 240px;
 	background: var(--background-primary);
 	border: 1px solid var(--background-modifier-border);
@@ -561,26 +565,59 @@
 	background: var(--background-modifier-error-hover);
 }
 
+.stratum-btn--icon {
+	width: 32px;
+	height: 32px;
+	padding: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 15px;
+	flex-shrink: 0;
+}
+
+.stratum-btn--icon-sm {
+	width: 26px;
+	height: 26px;
+	padding: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	flex-shrink: 0;
+}
+
+.stratum-config-menu__name-row {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+}
+
 .stratum-config-menu__done {
 	margin-top: 10px;
 }
 
 /* Sidebar config page */
 .stratum-sidebar-back {
-	background: none;
+	background: none !important;
 	border: none;
+	border-radius: var(--radius-s);
 	color: var(--text-muted);
 	cursor: pointer;
-	font-size: var(--font-ui-small);
-	padding: 2px 0 8px;
+	font-size: 16px;
+	line-height: 1;
+	width: 28px;
+	height: 28px;
 	display: flex;
 	align-items: center;
-	gap: 4px;
-	width: 100%;
-	text-align: left;
+	justify-content: center;
+	padding: 0;
+	flex-shrink: 0;
+	margin-bottom: 4px;
+	transition: background 0.1s, color 0.1s;
 }
 
 .stratum-sidebar-back:hover {
+	background: var(--interactive-hover) !important;
 	color: var(--text-normal);
 }
 
@@ -622,6 +659,48 @@
 	flex-direction: column;
 	gap: 4px;
 	margin-top: 4px;
+}
+
+/* Delete confirmation overlay — fills the config menu container */
+.stratum-delete-confirm {
+	position: absolute;
+	inset: 0;
+	z-index: 10;
+	border-radius: var(--radius-m);
+	background: color-mix(in srgb, var(--background-primary) 92%, transparent);
+	backdrop-filter: blur(8px);
+	-webkit-backdrop-filter: blur(8px);
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+	gap: 10px;
+	padding: 14px;
+}
+
+.stratum-delete-confirm__message {
+	margin: 0;
+	font-size: var(--font-ui-small);
+	color: var(--text-normal);
+	line-height: 1.5;
+}
+
+.stratum-delete-confirm__message span {
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+}
+
+.stratum-delete-confirm__skip {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	font-size: var(--font-ui-smaller);
+	color: var(--text-muted);
+	cursor: pointer;
+}
+
+.stratum-delete-confirm__actions {
+	display: flex;
+	gap: 6px;
 }
 
 /* Daily Note */

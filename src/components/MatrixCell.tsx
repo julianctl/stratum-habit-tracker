@@ -18,6 +18,7 @@ export default function MatrixCell({ isCompleted, hasNote, note, color, isToday,
 	const textareaRef = useRef<HTMLTextAreaElement>(null);
 
 	function openNote(e: MouseEvent) {
+		if (!isCompleted) return;
 		e.preventDefault();
 		setDraft(note);
 		setEditing(true);
@@ -34,7 +35,7 @@ export default function MatrixCell({ isCompleted, hasNote, note, color, isToday,
 			className={`stratum-cell ${isCompleted ? 'stratum-cell--done' : ''} ${isToday ? 'stratum-cell--today-col' : ''}`}
 			onClick={onToggle}
 			onContextMenu={openNote}
-			title="Click to toggle · Right-click to add note"
+			title={isCompleted ? 'Click to toggle · Right-click to add note' : 'Click to mark done'}
 			style={isCompleted && color ? { background: color, borderColor: color } : undefined}
 		>
 			{hasNote && <span className="stratum-cell__note-dot" />}

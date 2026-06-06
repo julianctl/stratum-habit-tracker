@@ -1,4 +1,26 @@
-import { type CSSProperties, useEffect, useState } from 'react';
+import { type CSSProperties, useEffect, useState, type SVGProps } from 'react';
+
+function IconArchive(props: SVGProps<SVGSVGElement>) {
+	return (
+		<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+			<rect width="20" height="5" x="2" y="3" rx="1"/>
+			<path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/>
+			<path d="M10 12h4"/>
+		</svg>
+	);
+}
+
+function IconTrash(props: SVGProps<SVGSVGElement>) {
+	return (
+		<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+			<path d="M3 6h18"/>
+			<path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/>
+			<path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+			<line x1="10" x2="10" y1="11" y2="17"/>
+			<line x1="14" x2="14" y1="11" y2="17"/>
+		</svg>
+	);
+}
 import type { Category, Habit } from '../types';
 import { isHabitCurrentlyActive, todayISO } from '../utils';
 
@@ -9,6 +31,7 @@ interface HabitConfigMenuProps {
 	categories: Category[];
 	extraClass?: string;
 	style?: CSSProperties;
+	skipDeleteConfirm: boolean;
 	onRename: (name: string) => void;
 	onSetColor: (color?: string) => void;
 	onSetCategory: (categoryId?: string) => void;
@@ -17,14 +40,18 @@ interface HabitConfigMenuProps {
 	onArchive: (endDate: string) => void;
 	onUnarchive: (startDate: string) => void;
 	onSetStartDate: (date: string) => void;
+	onDelete: () => void;
+	onSetSkipDeleteConfirm: (skip: boolean) => void;
 	onClose: () => void;
 }
 
 export default function HabitConfigMenu({
 	habit, categories,
 	extraClass, style,
+	skipDeleteConfirm,
 	onRename, onSetColor, onSetCategory, onCreateCategory, onSetCategoryColor,
 	onArchive, onUnarchive, onSetStartDate,
+	onDelete, onSetSkipDeleteConfirm,
 	onClose,
 }: HabitConfigMenuProps) {
 	const [name, setName] = useState(habit.name);
@@ -36,6 +63,8 @@ export default function HabitConfigMenu({
 	const [showArchiveForm, setShowArchiveForm] = useState(false);
 	const [archiveDate, setArchiveDate] = useState(todayISO());
 	const [restartDate, setRestartDate] = useState(todayISO());
+	const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+	const [dontShowAgain, setDontShowAgain] = useState(false);
 
 	useEffect(() => {
 		const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -72,13 +101,34 @@ export default function HabitConfigMenu({
 	return (
 		<div className={`stratum-config-menu${extraClass ? ` ${extraClass}` : ''}`} style={style} onClick={(e) => e.stopPropagation()}>
 			<label className="stratum-config-menu__label">Name</label>
-			<input
-				className="stratum-input"
-				value={name}
-				onChange={(e) => setName(e.target.value)}
-				onBlur={commitName}
-				onKeyDown={(e) => { if (e.key === 'Enter') { commitName(); onClose(); } if (e.key === 'Escape') onClose(); }}
-			/>
+			<div className="stratum-config-menu__name-row">
+				<input
+					className="stratum-input"
+					value={name}
+					onChange={(e) => setName(e.target.value)}
+					onBlur={commitName}
+					onKeyDown={(e) => { if (e.key === 'Enter') { commitName(); onClose(); } if (e.key === 'Escape') onClose(); }}
+				/>
+				{isActive && (
+					<button
+						className="stratum-btn stratum-btn--icon-sm"
+						title="Archive habit"
+						onClick={() => setShowArchiveForm((v) => !v)}
+					>
+						<IconArchive />
+					</button>
+				)}
+				<button
+					className="stratum-btn stratum-btn--icon-sm stratum-btn--danger"
+					title="Delete habit"
+					onClick={() => {
+						if (skipDeleteConfirm) { onDelete(); onClose(); }
+						else { setShowDeleteConfirm(true); }
+					}}
+				>
+					<IconTrash />
+				</button>
+			</div>
 
 			<label className="stratum-config-menu__label">Habit color</label>
 			<div className="stratum-config-menu__color-row">
@@ -146,15 +196,7 @@ export default function HabitConfigMenu({
 						value={lastPeriod.startDate}
 						onChange={(e) => onSetStartDate(e.target.value)}
 					/>
-					{!showArchiveForm ? (
-						<button
-							className="stratum-btn stratum-btn--full stratum-btn--danger"
-							style={{ marginTop: 6 }}
-							onClick={() => setShowArchiveForm(true)}
-						>
-							Archive habit
-						</button>
-					) : (
+					{showArchiveForm && (
 						<div className="stratum-config-menu__archive-form">
 							<label className="stratum-config-menu__label">Last active date</label>
 							<input
@@ -202,6 +244,41 @@ export default function HabitConfigMenu({
 				</div>
 			)}
 
+		{showDeleteConfirm && (
+				<div className="stratum-delete-confirm" onClick={(e) => e.stopPropagation()}>
+					<p className="stratum-delete-confirm__message">
+						Delete <strong>{habit.name}</strong>?<br />
+						<span>This will remove all logs for this habit.</span>
+					</p>
+					<label className="stratum-delete-confirm__skip">
+						<input
+							type="checkbox"
+							checked={dontShowAgain}
+							onChange={(e) => setDontShowAgain(e.target.checked)}
+						/>
+						Don't show this again
+					</label>
+					<div className="stratum-delete-confirm__actions">
+						<button
+							className="stratum-btn stratum-btn--tiny stratum-btn--danger"
+							onClick={() => {
+								if (dontShowAgain) onSetSkipDeleteConfirm(true);
+								onDelete();
+								onClose();
+							}}
+						>
+							Delete
+						</button>
+						<button
+							className="stratum-btn stratum-btn--tiny"
+							onClick={() => { setShowDeleteConfirm(false); setDontShowAgain(false); }}
+						>
+							Cancel
+						</button>
+					</div>
+					<span className="stratum-cell__note-hint">Restore via Settings → Delete confirmation</span>
+				</div>
+			)}
 		</div>
 	);
 }

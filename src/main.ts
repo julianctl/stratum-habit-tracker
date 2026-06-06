@@ -10,6 +10,7 @@ const DEFAULT_SETTINGS: StratumSettings = {
 	heatmapHeight: 200,
 	matrixDays: 50,
 	matrixColorScheme: 'stratum',
+	skipDeleteConfirm: false,
 };
 
 export default class StratumPlugin extends Plugin {

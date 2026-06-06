@@ -90,6 +90,10 @@ export default function App({ plugin }: AppProps) {
 		mutate((s) => plugin.store.unarchiveHabit(s, id, startDate));
 	const onSetHabitStartDate = (id: string, date: string) =>
 		mutate((s) => plugin.store.setHabitStartDate(s, id, date));
+	const onSetSkipDeleteConfirm = (skip: boolean) => {
+		plugin.settings.skipDeleteConfirm = skip;
+		void plugin.saveSettings();
+	};
 
 	// Log mutations
 	const onToggleLog = (habitId: string, date: string) =>
@@ -167,6 +171,8 @@ export default function App({ plugin }: AppProps) {
 					onArchiveHabit={onArchiveHabit}
 					onUnarchiveHabit={onUnarchiveHabit}
 					onSetHabitStartDate={onSetHabitStartDate}
+					skipDeleteConfirm={store.settings.skipDeleteConfirm}
+					onSetSkipDeleteConfirm={onSetSkipDeleteConfirm}
 				/>
 			</aside>
 		</div>
@@ -191,6 +197,9 @@ export default function App({ plugin }: AppProps) {
 						onArchive={(endDate) => { onArchiveHabit(habit.id, endDate); setFloatingMenu(null); }}
 						onUnarchive={(startDate) => { onUnarchiveHabit(habit.id, startDate); setFloatingMenu(null); }}
 						onSetStartDate={(date) => onSetHabitStartDate(habit.id, date)}
+						skipDeleteConfirm={store.settings.skipDeleteConfirm}
+						onDelete={() => { onDeleteHabit(habit.id); setFloatingMenu(null); }}
+						onSetSkipDeleteConfirm={onSetSkipDeleteConfirm}
 						onClose={() => setFloatingMenu(null)}
 					/>
 				</>,

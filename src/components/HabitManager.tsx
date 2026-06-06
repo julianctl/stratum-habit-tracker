@@ -106,7 +106,6 @@ export default function HabitManager({
 					onClick={() => onEditHabit(habit.id)}
 					title="Configure habit"
 				>⚙</button>
-				<button className="stratum-todo-item__delete" onClick={() => onDeleteHabit(habit.id)}>×</button>
 			</li>
 		);
 	}

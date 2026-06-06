@@ -35,6 +35,7 @@ export class StratumStore {
 				heatmapHeight: raw?.settings?.heatmapHeight ?? 200,
 				matrixDays: raw?.settings?.matrixDays ?? 50,
 				matrixColorScheme: raw?.settings?.matrixColorScheme ?? 'stratum',
+				skipDeleteConfirm: raw?.settings?.skipDeleteConfirm ?? false,
 			},
 			data: {
 				habits,

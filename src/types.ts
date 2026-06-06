@@ -43,6 +43,7 @@ export interface StratumSettings {
 	heatmapHeight: number;
 	matrixDays: number;
 	matrixColorScheme: 'stratum' | 'theme';
+	skipDeleteConfirm: boolean;
 }
 
 export interface PersistedStore {

@@ -76,6 +76,18 @@ export class StratumSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
+			.setName('Delete confirmation')
+			.setDesc('Show a confirmation dialog before deleting a habit. Re-enable if you previously checked "Don\'t show this again".')
+			.addToggle((toggle) =>
+				toggle
+					.setValue(!this.plugin.settings.skipDeleteConfirm)
+					.onChange(async (value) => {
+						this.plugin.settings.skipDeleteConfirm = !value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
 			.setName('Matrix range (days)')
 			.setDesc('Default number of days shown in the matrix month view (today at the right). You can still scroll and page beyond this.')
 			.addText((text) =>
