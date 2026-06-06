@@ -1,6 +1,7 @@
 /* Layout */
 .stratum-app {
 	display: flex;
+	position: relative;
 	height: 100%;
 	overflow: hidden;
 	font-family: var(--font-interface);
@@ -29,6 +30,64 @@
 	display: flex;
 	flex-direction: column;
 	gap: 20px;
+}
+
+/* Compact mode: sidebar floats over the content instead of docking. */
+.stratum-app--compact .stratum-sidebar {
+	position: absolute;
+	top: 0;
+	right: 0;
+	bottom: 0;
+	width: min(85%, 260px);
+	min-width: 0;
+	z-index: 15;
+	background: var(--background-primary);
+	box-shadow: -4px 0 16px rgba(0, 0, 0, 0.35);
+	transform: translateX(100%);
+	transition: transform 0.2s ease;
+}
+
+.stratum-app--compact .stratum-sidebar.stratum-sidebar--open {
+	transform: translateX(0);
+}
+
+.stratum-app--compact .stratum-sidebar-content {
+	padding-top: 44px;
+}
+
+/* Leave room at the matrix toolbar's right edge for the floating toggle. */
+.stratum-app--compact .stratum-matrix__toolbar {
+	padding-right: 38px;
+}
+
+.stratum-sidebar-backdrop {
+	position: absolute;
+	inset: 0;
+	z-index: 14;
+	background: rgba(0, 0, 0, 0.35);
+}
+
+.stratum-sidebar-toggle {
+	position: absolute;
+	top: 6px;
+	right: 8px;
+	z-index: 16;
+	width: 30px;
+	height: 30px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-s);
+	background: var(--interactive-normal);
+	color: var(--text-normal);
+	cursor: pointer;
+	font-size: 14px;
+	box-shadow: var(--shadow-s);
+}
+
+.stratum-sidebar-toggle:hover {
+	background: var(--interactive-hover);
 }
 
 .stratum-loading {
@@ -141,13 +200,14 @@
 	gap: 3px;
 	align-items: center;
 	width: max-content;
-	/* Right-align when narrower than the panel; overflow + scroll when wider. */
-	margin-left: auto;
+	/* Center when narrower than the panel; collapses to 0 when overflowing so
+	   the ResizeObserver scroll-pin can keep today at the right edge. */
+	margin: 0 auto;
 }
 
 .stratum-matrix__grid--fill {
 	width: 100%;
-	margin-left: 0;
+	margin: 0;
 }
 
 .stratum-matrix__corner,
@@ -207,6 +267,10 @@
 	padding: 0 8px 0 6px;
 }
 
+.stratum-matrix__habit-label--archived {
+	opacity: 0.5;
+}
+
 .stratum-matrix__habit-label-text {
 	font-size: var(--font-ui-small);
 	color: var(--text-normal);
@@ -249,6 +313,13 @@
 	border-color: var(--background-modifier-border-hover);
 }
 
+.stratum-cell--inactive {
+	background: transparent;
+	border: 1px solid transparent;
+	cursor: default;
+	pointer-events: none;
+}
+
 .stratum-cell__note-dot {
 	width: 5px;
 	height: 5px;
@@ -266,7 +337,7 @@
 .stratum-cell__note-popover {
 	position: absolute;
 	top: 26px;
-	left: 0;
+	right: 0;
 	z-index: 100;
 	background: var(--background-primary);
 	border: 1px solid var(--background-modifier-border);
@@ -274,6 +345,15 @@
 	box-shadow: var(--shadow-l);
 	padding: 6px;
 	min-width: 160px;
+}
+
+.stratum-cell__note-hint {
+	display: block;
+	margin-top: 4px;
+	font-size: 10px;
+	color: var(--text-faint);
+	text-align: center;
+	user-select: none;
 }
 
 .stratum-cell__note-popover textarea {
@@ -363,8 +443,12 @@
 	flex-shrink: 0;
 }
 
-.stratum-habit-item--drag-over {
+.stratum-habit-item--drop-before {
 	border-top: 2px solid var(--interactive-accent);
+}
+
+.stratum-habit-item--drop-after {
+	border-bottom: 2px solid var(--interactive-accent);
 }
 
 .stratum-habit-item__dot {
@@ -394,12 +478,7 @@
 
 /* Habit config menu (popover) */
 .stratum-config-menu {
-	position: absolute;
-	top: 100%;
-	right: 0;
-	z-index: 100;
-	margin-top: 4px;
-	width: 220px;
+	width: 240px;
 	background: var(--background-primary);
 	border: 1px solid var(--background-modifier-border);
 	border-radius: var(--radius-m);
@@ -408,6 +487,34 @@
 	display: flex;
 	flex-direction: column;
 	gap: 4px;
+}
+
+/* In-sidebar: anchored below the gear button */
+.stratum-habit-item .stratum-config-menu {
+	position: absolute;
+	top: 100%;
+	right: 0;
+	z-index: 100;
+	margin-top: 4px;
+}
+
+/* Floating: fixed to viewport with mica/acrylic blur */
+.stratum-config-menu--float {
+	position: fixed;
+	z-index: 1000;
+	background: color-mix(in srgb, var(--background-primary) 82%, transparent);
+	backdrop-filter: blur(20px) saturate(1.8);
+	-webkit-backdrop-filter: blur(20px) saturate(1.8);
+	border-color: color-mix(in srgb, var(--background-modifier-border) 60%, transparent);
+	box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35), 0 2px 8px rgba(0, 0, 0, 0.15);
+	max-height: 90vh;
+	overflow-y: auto;
+}
+
+.stratum-float-backdrop {
+	position: fixed;
+	inset: 0;
+	z-index: 999;
 }
 
 .stratum-config-menu__label {
@@ -444,8 +551,77 @@
 	padding: 2px 6px;
 }
 
+.stratum-btn--danger {
+	background: var(--background-modifier-error);
+	color: var(--text-error);
+	border-color: var(--background-modifier-error-hover);
+}
+
+.stratum-btn--danger:hover {
+	background: var(--background-modifier-error-hover);
+}
+
 .stratum-config-menu__done {
 	margin-top: 10px;
+}
+
+/* Sidebar config page */
+.stratum-sidebar-back {
+	background: none;
+	border: none;
+	color: var(--text-muted);
+	cursor: pointer;
+	font-size: var(--font-ui-small);
+	padding: 2px 0 8px;
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	width: 100%;
+	text-align: left;
+}
+
+.stratum-sidebar-back:hover {
+	color: var(--text-normal);
+}
+
+/* Config menu when rendered inline as a full sidebar page */
+.stratum-config-menu--sidebar-page {
+	width: 100%;
+	border: none;
+	box-shadow: none;
+	padding: 0;
+	background: transparent;
+}
+
+/* Archived habits section */
+.stratum-archived-section {
+	margin-top: 8px;
+}
+
+.stratum-archived-section__toggle {
+	background: none;
+	border: none;
+	color: var(--text-muted);
+	cursor: pointer;
+	font-size: var(--font-ui-smaller);
+	padding: 2px 0;
+	width: 100%;
+	text-align: left;
+}
+
+.stratum-archived-section__toggle:hover {
+	color: var(--text-normal);
+}
+
+.stratum-habit-item--archived {
+	opacity: 0.55;
+}
+
+.stratum-config-menu__archive-form {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	margin-top: 4px;
 }
 
 /* Daily Note */
@@ -464,7 +640,6 @@
 }
 
 .stratum-heatmap__scroll .react-calendar-heatmap {
-	height: 180px;
 	width: auto;
 	max-width: none;
 	display: block;

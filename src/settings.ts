@@ -37,6 +37,42 @@ export class StratumSettingTab extends PluginSettingTab {
 						this.plugin.settings.heatmapColor = value;
 						await this.plugin.saveSettings();
 					}),
+			)
+			.addButton((button) =>
+				button
+					.setButtonText('Revert to default')
+					.onClick(async () => {
+						this.plugin.settings.heatmapColor = '#a4968e';
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName('Year overview height (px)')
+			.setDesc('Height of the year overview heatmap in pixels.')
+			.addText((text) =>
+				text
+					.setPlaceholder('200')
+					.setValue(String(this.plugin.settings.heatmapHeight))
+					.onChange(async (value) => {
+						const n = parseInt(value, 10);
+						this.plugin.settings.heatmapHeight = Number.isFinite(n) && n > 0 ? n : 200;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName('Habit matrix color')
+			.setDesc('Color used for completed cells that have no per-habit or category color set.')
+			.addDropdown((drop) =>
+				drop
+					.addOption('stratum', 'Stratum default (#a4968e)')
+					.addOption('theme', "Obsidian theme (accent color)")
+					.setValue(this.plugin.settings.matrixColorScheme)
+					.onChange(async (value: string) => {
+						this.plugin.settings.matrixColorScheme = value as 'stratum' | 'theme';
+						await this.plugin.saveSettings();
+					}),
 			);
 
 		new Setting(containerEl)

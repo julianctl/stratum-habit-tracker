@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import type { Category, Habit, HabitLog } from '../types';
+import { isHabitActiveOn, isHabitCurrentlyActive } from '../utils';
 import MatrixCell from './MatrixCell';
 
 interface HabitMatrixProps {
@@ -7,8 +8,10 @@ interface HabitMatrixProps {
 	categories: Category[];
 	logMap: Map<string, HabitLog>;
 	monthDays: number;
+	defaultColor?: string;
 	onToggleLog: (habitId: string, date: string) => void;
 	onSetLogNote: (habitId: string, date: string, note: string) => void;
+	onHabitContextMenu?: (habitId: string, x: number, y: number) => void;
 }
 
 type ViewMode = 'week' | 'month';
@@ -40,34 +43,33 @@ function formatHeader(date: string, mode: ViewMode, index: number): string {
 	if (mode === 'week') {
 		return d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric' });
 	}
-	// Month view: show the month abbreviation on the 1st of a month or the leftmost column.
 	if (d.getDate() === 1 || index === 0) {
 		return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 	}
 	return d.getDate().toString();
 }
 
-export default function HabitMatrix({ habits, categories, logMap, monthDays, onToggleLog, onSetLogNote }: HabitMatrixProps) {
+export default function HabitMatrix({ habits, categories, logMap, monthDays, defaultColor, onToggleLog, onSetLogNote, onHabitContextMenu }: HabitMatrixProps) {
 	const [mode, setMode] = useState<ViewMode>('week');
 	const [pageOffset, setPageOffset] = useState(0);
+	const [showArchived, setShowArchived] = useState(false);
 	const scrollRef = useRef<HTMLDivElement>(null);
 
 	const dates = useMemo(() => getDates(mode, monthDays, pageOffset), [mode, monthDays, pageOffset]);
 	const todayStr = isoDay(0);
 
-	// Keep today (the end-most column) in view: scroll to the right edge on changes.
+	const hasArchived = habits.some((h) => !isHabitCurrentlyActive(h));
+	const visibleHabits = showArchived ? habits : habits.filter(isHabitCurrentlyActive);
+
 	useEffect(() => {
 		const el = scrollRef.current;
 		if (el) el.scrollLeft = el.scrollWidth;
-	}, [mode, monthDays, pageOffset, habits.length]);
+	}, [mode, monthDays, pageOffset, visibleHabits.length]);
 
-	// Re-pin to the right edge when the panel is resized (month view).
 	useEffect(() => {
 		const el = scrollRef.current;
 		if (!el || mode !== 'month') return;
-		const ro = new ResizeObserver(() => {
-			el.scrollLeft = el.scrollWidth;
-		});
+		const ro = new ResizeObserver(() => { el.scrollLeft = el.scrollWidth; });
 		ro.observe(el);
 		return () => ro.disconnect();
 	}, [mode]);
@@ -78,7 +80,11 @@ export default function HabitMatrix({ habits, categories, logMap, monthDays, onT
 		return map;
 	}, [categories]);
 
-	function effectiveColor(habit: Habit): string | undefined {
+	function cellColor(habit: Habit): string | undefined {
+		return habit.color ?? (habit.categoryId ? catColor.get(habit.categoryId) : undefined) ?? defaultColor;
+	}
+
+	function ribbonColor(habit: Habit): string | undefined {
 		return habit.color ?? (habit.categoryId ? catColor.get(habit.categoryId) : undefined);
 	}
 
@@ -96,8 +102,6 @@ export default function HabitMatrix({ habits, categories, logMap, monthDays, onT
 	}
 
 	const isWeek = mode === 'week';
-	// Week: flexible label column fills width so the 7 days align right.
-	// Month: fixed label + fixed columns inside a horizontal scroll container.
 	const gridTemplate = isWeek
 		? `minmax(80px, 1fr) repeat(${dates.length}, ${COL_WIDTH}px)`
 		: `${LABEL_WIDTH}px repeat(${dates.length}, ${COL_WIDTH}px)`;
@@ -113,6 +117,15 @@ export default function HabitMatrix({ habits, categories, logMap, monthDays, onT
 							<button title="Newer" disabled={pageOffset === 0} onClick={() => setPageOffset((o) => Math.max(0, o - monthDays))}>›</button>
 							<button title="Jump to today" disabled={pageOffset === 0} onClick={() => setPageOffset(0)}>Today</button>
 						</div>
+					)}
+					{hasArchived && (
+						<button
+							className={`stratum-btn stratum-btn--tiny ${showArchived ? 'stratum-btn--active' : ''}`}
+							onClick={() => setShowArchived((v) => !v)}
+							title="Toggle archived habits"
+						>
+							Archived
+						</button>
 					)}
 					<div className="stratum-matrix__toggle">
 						<button
@@ -143,15 +156,30 @@ export default function HabitMatrix({ habits, categories, logMap, monthDays, onT
 						</div>
 					))}
 					{/* Habit rows */}
-					{habits.map((habit) => {
-						const color = effectiveColor(habit);
+					{visibleHabits.map((habit) => {
+						const fill = cellColor(habit);
+						const ribbon = ribbonColor(habit);
+						const isArchived = !isHabitCurrentlyActive(habit);
 						return (
 							<Fragment key={habit.id}>
-								<div className="stratum-matrix__habit-label" style={color ? { borderLeftColor: color } : {}}>
+								<div
+									className={`stratum-matrix__habit-label ${isArchived ? 'stratum-matrix__habit-label--archived' : ''}`}
+									style={ribbon ? { borderLeftColor: ribbon } : {}}
+									onContextMenu={onHabitContextMenu ? (e) => {
+										e.preventDefault();
+										e.stopPropagation();
+										onHabitContextMenu(habit.id, e.clientX, e.clientY);
+									} : undefined}
+									title={onHabitContextMenu ? 'Right-click to configure' : undefined}
+								>
 									<span className="stratum-matrix__habit-label-text">{habit.name}</span>
 								</div>
 								{dates.map((date) => {
 									const key = `${habit.id}::${date}`;
+									const inactive = !isHabitActiveOn(habit, date);
+									if (inactive) {
+										return <div key={key} className="stratum-cell stratum-cell--inactive" />;
+									}
 									const log = logMap.get(key);
 									return (
 										<MatrixCell
@@ -161,7 +189,7 @@ export default function HabitMatrix({ habits, categories, logMap, monthDays, onT
 											isCompleted={!!log}
 											hasNote={!!log?.note}
 											note={log?.note ?? ''}
-											color={color}
+											color={fill}
 											isToday={date === todayStr}
 											onToggle={() => onToggleLog(habit.id, date)}
 											onSetNote={(note) => onSetLogNote(habit.id, date, note)}

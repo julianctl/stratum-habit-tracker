@@ -1,22 +1,30 @@
-import { useState } from 'react';
+import { type CSSProperties, useEffect, useState } from 'react';
 import type { Category, Habit } from '../types';
+import { isHabitCurrentlyActive, todayISO } from '../utils';
 
 const NEW_CATEGORY_PALETTE = ['#4caf50', '#2196f3', '#ff9800', '#e91e63', '#9c27b0', '#00bcd4'];
 
 interface HabitConfigMenuProps {
 	habit: Habit;
 	categories: Category[];
+	extraClass?: string;
+	style?: CSSProperties;
 	onRename: (name: string) => void;
 	onSetColor: (color?: string) => void;
 	onSetCategory: (categoryId?: string) => void;
 	onCreateCategory: (name: string, color: string) => void;
 	onSetCategoryColor: (categoryId: string, color: string) => void;
+	onArchive: (endDate: string) => void;
+	onUnarchive: (startDate: string) => void;
+	onSetStartDate: (date: string) => void;
 	onClose: () => void;
 }
 
 export default function HabitConfigMenu({
 	habit, categories,
+	extraClass, style,
 	onRename, onSetColor, onSetCategory, onCreateCategory, onSetCategoryColor,
+	onArchive, onUnarchive, onSetStartDate,
 	onClose,
 }: HabitConfigMenuProps) {
 	const [name, setName] = useState(habit.name);
@@ -25,7 +33,18 @@ export default function HabitConfigMenu({
 	const [newCatColor, setNewCatColor] = useState(
 		NEW_CATEGORY_PALETTE[categories.length % NEW_CATEGORY_PALETTE.length]!,
 	);
+	const [showArchiveForm, setShowArchiveForm] = useState(false);
+	const [archiveDate, setArchiveDate] = useState(todayISO());
+	const [restartDate, setRestartDate] = useState(todayISO());
 
+	useEffect(() => {
+		const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+		document.addEventListener('keydown', handler);
+		return () => document.removeEventListener('keydown', handler);
+	}, [onClose]);
+
+	const isActive = isHabitCurrentlyActive(habit);
+	const lastPeriod = habit.periods[habit.periods.length - 1];
 	const category = categories.find((c) => c.id === habit.categoryId);
 
 	function commitName() {
@@ -51,7 +70,7 @@ export default function HabitConfigMenu({
 	}
 
 	return (
-		<div className="stratum-config-menu" onClick={(e) => e.stopPropagation()}>
+		<div className={`stratum-config-menu${extraClass ? ` ${extraClass}` : ''}`} style={style} onClick={(e) => e.stopPropagation()}>
 			<label className="stratum-config-menu__label">Name</label>
 			<input
 				className="stratum-input"
@@ -65,7 +84,7 @@ export default function HabitConfigMenu({
 			<div className="stratum-config-menu__color-row">
 				<input
 					type="color"
-					value={habit.color ?? category?.color ?? '#4caf50'}
+					value={habit.color ?? category?.color ?? '#a4968e'}
 					onChange={(e) => onSetColor(e.target.value)}
 				/>
 				{habit.color && (
@@ -117,7 +136,72 @@ export default function HabitConfigMenu({
 				</div>
 			)}
 
-			<button className="stratum-btn stratum-btn--full stratum-config-menu__done" onClick={onClose}>Done</button>
+			{/* Active since / archive controls */}
+			{isActive && lastPeriod && (
+				<>
+					<label className="stratum-config-menu__label">Active since</label>
+					<input
+						type="date"
+						className="stratum-input"
+						value={lastPeriod.startDate}
+						onChange={(e) => onSetStartDate(e.target.value)}
+					/>
+					{!showArchiveForm ? (
+						<button
+							className="stratum-btn stratum-btn--full stratum-btn--danger"
+							style={{ marginTop: 6 }}
+							onClick={() => setShowArchiveForm(true)}
+						>
+							Archive habit
+						</button>
+					) : (
+						<div className="stratum-config-menu__archive-form">
+							<label className="stratum-config-menu__label">Last active date</label>
+							<input
+								type="date"
+								className="stratum-input"
+								value={archiveDate}
+								onChange={(e) => setArchiveDate(e.target.value)}
+							/>
+							<div className="stratum-config-menu__color-row" style={{ marginTop: 4 }}>
+								<button
+									className="stratum-btn stratum-btn--tiny stratum-btn--danger"
+									onClick={() => { onArchive(archiveDate); onClose(); }}
+								>
+									Confirm
+								</button>
+								<button className="stratum-btn stratum-btn--tiny" onClick={() => setShowArchiveForm(false)}>
+									Cancel
+								</button>
+							</div>
+						</div>
+					)}
+				</>
+			)}
+
+			{/* Restart controls for archived habits */}
+			{!isActive && (
+				<div className="stratum-config-menu__archive-form">
+					<label className="stratum-config-menu__label">
+						Archived · {habit.periods.length} period{habit.periods.length !== 1 ? 's' : ''}
+					</label>
+					<label className="stratum-config-menu__label">Restart from</label>
+					<input
+						type="date"
+						className="stratum-input"
+						value={restartDate}
+						onChange={(e) => setRestartDate(e.target.value)}
+					/>
+					<button
+						className="stratum-btn stratum-btn--full"
+						style={{ marginTop: 4 }}
+						onClick={() => { onUnarchive(restartDate); onClose(); }}
+					>
+						Restart habit
+					</button>
+				</div>
+			)}
+
 		</div>
 	);
 }

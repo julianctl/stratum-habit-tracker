@@ -1,11 +1,13 @@
 import { cloneElement, useEffect, useMemo, useRef, type ReactElement, type SVGProps } from 'react';
 import CalendarHeatmap from 'react-calendar-heatmap';
 import type { Habit, HabitLog } from '../types';
+import { isHabitActiveOn } from '../utils';
 
 interface HabitHeatmapProps {
 	habits: Habit[];
 	logs: HabitLog[];
 	color: string;
+	height: number;
 }
 
 function getYearAgo(): Date {
@@ -23,7 +25,7 @@ function levelClass(count: number, total: number): string {
 	return 'stratum-heatmap__cell--4';
 }
 
-export default function HabitHeatmap({ habits, logs, color }: HabitHeatmapProps) {
+export default function HabitHeatmap({ habits, logs, color, height }: HabitHeatmapProps) {
 	const scrollRef = useRef<HTMLDivElement>(null);
 
 	const values = useMemo(() => {
@@ -33,6 +35,21 @@ export default function HabitHeatmap({ habits, logs, color }: HabitHeatmapProps)
 		}
 		return Array.from(counts.entries()).map(([date, count]) => ({ date, count }));
 	}, [logs]);
+
+	// For each day in the heatmap window, count how many habits were active.
+	// This is the per-day denominator for completion percentage.
+	const activeCountByDate = useMemo(() => {
+		const map = new Map<string, number>();
+		const today = new Date();
+		const d = new Date(today);
+		d.setFullYear(d.getFullYear() - 1);
+		while (d <= today) {
+			const iso = d.toISOString().slice(0, 10);
+			map.set(iso, habits.filter((h) => isHabitActiveOn(h, iso)).length);
+			d.setDate(d.getDate() + 1);
+		}
+		return map;
+	}, [habits]);
 
 	// Default to the rightmost (most recent) and re-pin on resize. When the
 	// heatmap fully fits, scrollWidth === clientWidth so it stays centered (CSS).
@@ -48,8 +65,6 @@ export default function HabitHeatmap({ habits, logs, color }: HabitHeatmapProps)
 
 	if (habits.length === 0) return null;
 
-	const total = habits.length;
-
 	return (
 		<div className="stratum-heatmap">
 			<style>{`
@@ -57,6 +72,7 @@ export default function HabitHeatmap({ habits, logs, color }: HabitHeatmapProps)
 				.stratum-heatmap rect.stratum-heatmap__cell--2 { fill: ${color} !important; opacity: 0.50; }
 				.stratum-heatmap rect.stratum-heatmap__cell--3 { fill: ${color} !important; opacity: 0.75; }
 				.stratum-heatmap rect.stratum-heatmap__cell--4 { fill: ${color} !important; opacity: 1.0; }
+				.stratum-heatmap .react-calendar-heatmap { height: ${height}px !important; }
 			`}</style>
 			<h3 className="stratum-section-title">Year Overview</h3>
 			<div className="stratum-heatmap__scroll" ref={scrollRef}>
@@ -64,7 +80,11 @@ export default function HabitHeatmap({ habits, logs, color }: HabitHeatmapProps)
 					startDate={getYearAgo()}
 					endDate={new Date()}
 					values={values}
-					classForValue={(value) => levelClass(Number(value?.count ?? 0), total)}
+					classForValue={(value) => {
+						const count = Number(value?.count ?? 0);
+						const total = value ? (activeCountByDate.get(value.date) ?? 0) : 0;
+						return levelClass(count, total);
+					}}
 					showWeekdayLabels
 					transformDayElement={(el) =>
 						cloneElement(el as unknown as ReactElement<SVGProps<SVGRectElement>>, { rx: 2, ry: 2 })

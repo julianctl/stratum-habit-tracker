@@ -49,6 +49,7 @@ export default function MatrixCell({ isCompleted, hasNote, note, color, isToday,
 						placeholder="Add a note..."
 						rows={3}
 					/>
+					<span className="stratum-cell__note-hint">ESC to cancel · Enter to save</span>
 				</div>
 			)}
 		</div>

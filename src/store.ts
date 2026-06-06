@@ -1,6 +1,7 @@
 import { TFile } from 'obsidian';
 import type StratumPlugin from './main';
 import type { Category, Habit, HabitLog, PersistedStore, StratumData, Todo } from './types';
+import { todayISO } from './utils';
 
 const DEFAULT_DATA: StratumData = {
 	habits: [],
@@ -14,14 +15,29 @@ export class StratumStore {
 
 	async load(): Promise<PersistedStore> {
 		const raw = (await this.plugin.loadData()) as Partial<PersistedStore> | null;
+		const today = todayISO();
+		const habits: Habit[] = (raw?.data?.habits ?? DEFAULT_DATA.habits).map((h) => {
+			// Migration: habits created before multi-period support have no periods array.
+			if (!h.periods || h.periods.length === 0) {
+				const logs = (raw?.data?.logs ?? []);
+				const earliest = logs
+					.filter((l) => l.habitId === h.id)
+					.map((l) => l.date)
+					.sort()[0] ?? today;
+				return { ...h, periods: [{ startDate: earliest }] };
+			}
+			return h;
+		});
 		return {
 			settings: {
 				dailyNoteFolder: raw?.settings?.dailyNoteFolder ?? 'Stratum/Daily Notes',
-				heatmapColor: raw?.settings?.heatmapColor ?? '#4caf50',
+				heatmapColor: raw?.settings?.heatmapColor ?? '#a4968e',
+				heatmapHeight: raw?.settings?.heatmapHeight ?? 200,
 				matrixDays: raw?.settings?.matrixDays ?? 50,
+				matrixColorScheme: raw?.settings?.matrixColorScheme ?? 'stratum',
 			},
 			data: {
-				habits: raw?.data?.habits ?? DEFAULT_DATA.habits,
+				habits,
 				logs: raw?.data?.logs ?? DEFAULT_DATA.logs,
 				todos: raw?.data?.todos ?? DEFAULT_DATA.todos,
 				categories: raw?.data?.categories ?? DEFAULT_DATA.categories,
@@ -36,7 +52,7 @@ export class StratumStore {
 	// --- Habits ---
 
 	async addHabit(store: PersistedStore, name: string, color?: string): Promise<PersistedStore> {
-		const habit: Habit = { id: Date.now().toString(), name, ...(color ? { color } : {}) };
+		const habit: Habit = { id: Date.now().toString(), name, periods: [{ startDate: todayISO() }], ...(color ? { color } : {}) };
 		const next = { ...store, data: { ...store.data, habits: [...store.data.habits, habit] } };
 		await this.save(next);
 		return next;
@@ -132,6 +148,49 @@ export class StratumStore {
 		return next;
 	}
 
+	// --- Habit periods (archive / unarchive) ---
+
+	async archiveHabit(store: PersistedStore, habitId: string, endDate: string): Promise<PersistedStore> {
+		const habits = store.data.habits.map((h) => {
+			if (h.id !== habitId) return h;
+			const periods = [...h.periods];
+			const last = periods[periods.length - 1];
+			if (!last || last.endDate) return h; // already archived
+			periods[periods.length - 1] = { ...last, endDate };
+			return { ...h, periods };
+		});
+		const next = { ...store, data: { ...store.data, habits } };
+		await this.save(next);
+		return next;
+	}
+
+	async unarchiveHabit(store: PersistedStore, habitId: string, startDate: string): Promise<PersistedStore> {
+		const habits = store.data.habits.map((h) => {
+			if (h.id !== habitId) return h;
+			const last = h.periods[h.periods.length - 1];
+			if (!last || !last.endDate) return h; // already active
+			return { ...h, periods: [...h.periods, { startDate }] };
+		});
+		const next = { ...store, data: { ...store.data, habits } };
+		await this.save(next);
+		return next;
+	}
+
+	// Sets the startDate of the most recent period (editable before archiving).
+	async setHabitStartDate(store: PersistedStore, habitId: string, startDate: string): Promise<PersistedStore> {
+		const habits = store.data.habits.map((h) => {
+			if (h.id !== habitId) return h;
+			const periods = [...h.periods];
+			const last = periods[periods.length - 1];
+			if (!last) return h;
+			periods[periods.length - 1] = { ...last, startDate };
+			return { ...h, periods };
+		});
+		const next = { ...store, data: { ...store.data, habits } };
+		await this.save(next);
+		return next;
+	}
+
 	// --- Logs ---
 
 	async toggleLog(store: PersistedStore, habitId: string, date: string): Promise<PersistedStore> {
@@ -153,11 +212,16 @@ export class StratumStore {
 		return next;
 	}
 
+	// toIndex is the desired insert position in the *original* array (0 = before first, N = after last).
 	async reorderHabits(store: PersistedStore, fromIndex: number, toIndex: number): Promise<PersistedStore> {
+		if (toIndex === fromIndex || toIndex === fromIndex + 1) return store;
 		const habits = [...store.data.habits];
-		const moved = habits.splice(fromIndex, 1)[0];
+		const [moved] = habits.splice(fromIndex, 1);
 		if (!moved) return store;
-		habits.splice(toIndex, 0, moved);
+		// After removing fromIndex every element above it shifted left by 1,
+		// so the original toIndex is now at toIndex - 1 when toIndex > fromIndex.
+		const insertAt = toIndex > fromIndex ? toIndex - 1 : toIndex;
+		habits.splice(insertAt, 0, moved);
 		const next = { ...store, data: { ...store.data, habits } };
 		await this.save(next);
 		return next;

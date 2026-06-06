@@ -4,11 +4,17 @@ export interface Category {
 	color: string;
 }
 
+export interface HabitPeriod {
+	startDate: string; // YYYY-MM-DD, inclusive
+	endDate?: string;  // YYYY-MM-DD, inclusive; absent = currently active
+}
+
 export interface Habit {
 	id: string;
 	name: string;
 	color?: string; // per-habit override; falls back to category color
 	categoryId?: string;
+	periods: HabitPeriod[]; // chronological, non-overlapping
 }
 
 export interface HabitLog {
@@ -34,7 +40,9 @@ export interface StratumData {
 export interface StratumSettings {
 	dailyNoteFolder: string;
 	heatmapColor: string;
+	heatmapHeight: number;
 	matrixDays: number;
+	matrixColorScheme: 'stratum' | 'theme';
 }
 
 export interface PersistedStore {

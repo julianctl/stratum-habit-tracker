@@ -6,8 +6,10 @@ import { StratumView, VIEW_TYPE_STRATUM } from './view';
 
 const DEFAULT_SETTINGS: StratumSettings = {
 	dailyNoteFolder: 'Stratum/Daily Notes',
-	heatmapColor: '#4caf50',
+	heatmapColor: '#a4968e',
+	heatmapHeight: 200,
 	matrixDays: 50,
+	matrixColorScheme: 'stratum',
 };
 
 export default class StratumPlugin extends Plugin {
