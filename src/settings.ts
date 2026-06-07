@@ -62,6 +62,32 @@ export class StratumSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
+			.setName('Heatmap range (days)')
+			.setDesc('Default number of days shown in the habit heatmap (today at the right). You can sync this from the heatmap footer too.')
+			.addText((text) =>
+				text
+					.setPlaceholder('365')
+					.setValue(String(this.plugin.settings.heatmapDays))
+					.onChange(async (value) => {
+						const n = parseInt(value, 10);
+						this.plugin.settings.heatmapDays = Number.isFinite(n) && n > 0 ? n : 365;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName('Show heatmap range control')
+			.setDesc('Show the day-count field in the heatmap footer for quick access to the setting above.')
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.showHeatmapDaysInput)
+					.onChange(async (value) => {
+						this.plugin.settings.showHeatmapDaysInput = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
 			.setName('Habit matrix color')
 			.setDesc('Color used for completed cells that have no per-habit or category color set.')
 			.addDropdown((drop) =>
@@ -110,6 +136,18 @@ export class StratumSettingTab extends PluginSettingTab {
 					.onChange(async (value) => {
 						const n = parseInt(value, 10);
 						this.plugin.settings.matrixDays = Number.isFinite(n) && n > 0 ? n : 50;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName('Show matrix range control')
+			.setDesc('Show the day-count field in the matrix footer for quick access to the setting above.')
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.showMatrixDaysInput)
+					.onChange(async (value) => {
+						this.plugin.settings.showMatrixDaysInput = value;
 						await this.plugin.saveSettings();
 					}),
 			);

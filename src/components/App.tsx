@@ -3,9 +3,8 @@ import { createPortal } from 'react-dom';
 import type StratumPlugin from '../main';
 import type { HabitLog, PersistedStore } from '../types';
 import { normalizeGroupedHabits } from '../utils';
+import Dashboard, { type ModuleDestination } from './Dashboard';
 import HabitConfigMenu from './HabitConfigMenu';
-import HabitHeatmap from './HabitHeatmap';
-import HabitMatrix from './HabitMatrix';
 import Sidebar from './Sidebar';
 
 interface AppProps {
@@ -19,7 +18,7 @@ export default function App({ plugin }: AppProps) {
 	const [store, setStore] = useState<PersistedStore | null>(null);
 	const [compact, setCompact] = useState(false);
 	const [sidebarOpen, setSidebarOpen] = useState(false);
-	const [floatingMenu, setFloatingMenu] = useState<{ habitId: string; x: number; y: number } | null>(null);
+	const [floatingMenu, setFloatingMenu] = useState<{ habitId: string; x: number; y: number; isNew?: boolean } | null>(null);
 	const rootRef = useRef<HTMLDivElement>(null);
 
 	useEffect(() => {
@@ -114,8 +113,18 @@ export default function App({ plugin }: AppProps) {
 		mutate((s) => plugin.store.unarchiveHabit(s, id, startDate));
 	const onSetHabitStartDate = (id: string, date: string) =>
 		mutate((s) => plugin.store.setHabitStartDate(s, id, date));
+	const onMoveModule = (moduleId: string, destination: ModuleDestination) =>
+		mutate((s) => plugin.store.moveModule(s, moduleId, destination));
 	const onSetSkipDeleteConfirm = (skip: boolean) => {
 		plugin.settings.skipDeleteConfirm = skip;
+		void plugin.saveSettings();
+	};
+	const onSetMatrixDays = (days: number) => {
+		plugin.settings.matrixDays = days;
+		void plugin.saveSettings();
+	};
+	const onSetHeatmapDays = (days: number) => {
+		plugin.settings.heatmapDays = days;
 		void plugin.saveSettings();
 	};
 
@@ -141,6 +150,15 @@ export default function App({ plugin }: AppProps) {
 		const x = Math.min(clientX, window.innerWidth - FLOAT_W - 8);
 		setFloatingMenu({ habitId, x, y: clientY });
 	};
+	// "+ New habit" in the matrix footer: same creation flow as the sidebar's
+	// quick-add, but opens the floating config menu instead of a sidebar page.
+	const onQuickAddHabitAt = (clientX: number, clientY: number): void => {
+		void (async () => {
+			const habitId = await onQuickAddHabit();
+			const x = Math.min(clientX, window.innerWidth - FLOAT_W - 8);
+			setFloatingMenu({ habitId, x, y: clientY, isNew: true });
+		})();
+	};
 
 	// Daily note
 	const onOpenDailyNote = (date: string): void => {
@@ -151,17 +169,27 @@ export default function App({ plugin }: AppProps) {
 		<>
 		<div className={`stratum-app ${compact ? 'stratum-app--compact' : ''}`} ref={rootRef}>
 			<main className="stratum-main">
-				<HabitMatrix
+				<Dashboard
+					layout={store.data.layout}
 					habits={habits}
 					categories={categories}
 					logMap={logMap}
-					monthDays={store.settings.matrixDays}
+					logs={store.data.logs}
+					matrixDays={store.settings.matrixDays}
 					defaultColor={store.settings.matrixColorScheme === 'stratum' ? '#a4968e' : undefined}
+					heatmapColor={store.settings.heatmapColor}
+					heatmapHeight={store.settings.heatmapHeight}
+					heatmapDays={store.settings.heatmapDays}
+					showMatrixDaysInput={store.settings.showMatrixDaysInput}
+					showHeatmapDaysInput={store.settings.showHeatmapDaysInput}
 					onToggleLog={onToggleLog}
 					onSetLogNote={onSetLogNote}
 					onHabitContextMenu={onHabitContextMenu}
+					onQuickAddHabitAt={onQuickAddHabitAt}
+					onSetMatrixDays={onSetMatrixDays}
+					onSetHeatmapDays={onSetHeatmapDays}
+					onMoveModule={onMoveModule}
 				/>
-				<HabitHeatmap habits={habits} logs={store.data.logs} color={store.settings.heatmapColor} height={store.settings.heatmapHeight} />
 			</main>
 			{compact && (
 				<button
@@ -219,6 +247,7 @@ export default function App({ plugin }: AppProps) {
 						style={{ left: floatingMenu.x, top: floatingMenu.y }}
 						habit={habit}
 						categories={categories}
+						initialClearName={floatingMenu.isNew ?? false}
 						onRename={(name) => onRenameHabit(habit.id, name)}
 						onSetColor={(c) => onSetHabitColor(habit.id, c)}
 						onSetCategory={(catId) => onSetHabitCategory(habit.id, catId)}

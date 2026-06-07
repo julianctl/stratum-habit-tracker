@@ -1,7 +1,7 @@
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState, type SVGProps } from 'react';
 import { createPortal } from 'react-dom';
 import type { Category, Habit, HabitLog } from '../types';
-import { isHabitActiveOn, isHabitCurrentlyActive } from '../utils';
+import { isHabitActiveOn, isHabitCurrentlyActive, useHorizontalWheelScroll } from '../utils';
 import MatrixCell from './MatrixCell';
 
 interface HabitMatrixProps {
@@ -13,12 +13,39 @@ interface HabitMatrixProps {
 	onToggleLog: (habitId: string, date: string) => void;
 	onSetLogNote: (habitId: string, date: string, note: string) => void;
 	onHabitContextMenu?: (habitId: string, x: number, y: number) => void;
+	onQuickAddHabitAt: (clientX: number, clientY: number) => void;
+	onSetMatrixDays: (days: number) => void;
+	showDaysInput: boolean;
 }
 
-type ViewMode = 'week' | 'month';
+function IconChevronLeft(props: SVGProps<SVGSVGElement>) {
+	return (
+		<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+			<path d="m15 18-6-6 6-6"/>
+		</svg>
+	);
+}
+
+function IconChevronRight(props: SVGProps<SVGSVGElement>) {
+	return (
+		<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+			<path d="m9 18 6-6-6-6"/>
+		</svg>
+	);
+}
+
+function IconPlus(props: SVGProps<SVGSVGElement>) {
+	return (
+		<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+			<path d="M5 12h14"/>
+			<path d="M12 5v14"/>
+		</svg>
+	);
+}
 
 const LABEL_WIDTH = 110;
 const COL_WIDTH = 26;
+const GRID_GAP = 3;
 
 // ISO date string (YYYY-MM-DD) for `offset` days before today.
 function isoDay(offset: number): string {
@@ -28,22 +55,17 @@ function isoDay(offset: number): string {
 	return d.toISOString().slice(0, 10);
 }
 
-// Window of dates (oldest first, end-most last) ending `pageOffset` days before today.
-function getDates(mode: ViewMode, monthDays: number, pageOffset: number): string[] {
+// Window of `count` dates (oldest first) ending `pageOffset` days before today.
+function getDates(count: number, pageOffset: number): string[] {
 	const dates: string[] = [];
-	const count = mode === 'week' ? 7 : monthDays;
-	const end = mode === 'week' ? 0 : pageOffset;
 	for (let i = count - 1; i >= 0; i--) {
-		dates.push(isoDay(end + i));
+		dates.push(isoDay(pageOffset + i));
 	}
 	return dates;
 }
 
-function formatHeader(date: string, mode: ViewMode, index: number): string {
+function formatHeader(date: string, index: number): string {
 	const d = new Date(date + 'T00:00:00');
-	if (mode === 'week') {
-		return d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric' });
-	}
 	if (d.getDate() === 1 || index === 0) {
 		return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 	}
@@ -61,16 +83,16 @@ interface NotePopover {
 	y: number;
 }
 
-export default function HabitMatrix({ habits, categories, logMap, monthDays, defaultColor, onToggleLog, onSetLogNote, onHabitContextMenu }: HabitMatrixProps) {
-	const [mode, setMode] = useState<ViewMode>('week');
+export default function HabitMatrix({ habits, categories, logMap, monthDays, defaultColor, onToggleLog, onSetLogNote, onHabitContextMenu, onQuickAddHabitAt, onSetMatrixDays, showDaysInput }: HabitMatrixProps) {
 	const [pageOffset, setPageOffset] = useState(0);
 	const [showArchived, setShowArchived] = useState(false);
 	const [notePopover, setNotePopover] = useState<NotePopover | null>(null);
 	const [noteDraft, setNoteDraft] = useState('');
 	const noteTextareaRef = useRef<HTMLTextAreaElement>(null);
 	const scrollRef = useRef<HTMLDivElement>(null);
+	useHorizontalWheelScroll(scrollRef);
 
-	const dates = useMemo(() => getDates(mode, monthDays, pageOffset), [mode, monthDays, pageOffset]);
+	const dates = useMemo(() => getDates(monthDays, pageOffset), [monthDays, pageOffset]);
 	const todayStr = isoDay(0);
 
 	const hasArchived = habits.some((h) => !isHabitCurrentlyActive(h));
@@ -79,15 +101,15 @@ export default function HabitMatrix({ habits, categories, logMap, monthDays, def
 	useEffect(() => {
 		const el = scrollRef.current;
 		if (el) el.scrollLeft = el.scrollWidth;
-	}, [mode, monthDays, pageOffset, visibleHabits.length]);
+	}, [monthDays, pageOffset, visibleHabits.length]);
 
 	useEffect(() => {
 		const el = scrollRef.current;
-		if (!el || mode !== 'month') return;
+		if (!el) return;
 		const ro = new ResizeObserver(() => { el.scrollLeft = el.scrollWidth; });
 		ro.observe(el);
 		return () => ro.disconnect();
-	}, [mode]);
+	}, []);
 
 	const catColor = useMemo(() => {
 		const map = new Map<string, string>();
@@ -103,9 +125,9 @@ export default function HabitMatrix({ habits, categories, logMap, monthDays, def
 		return habit.color ?? (habit.categoryId ? catColor.get(habit.categoryId) : undefined);
 	}
 
-	function switchMode(next: ViewMode) {
-		setMode(next);
-		setPageOffset(0);
+	function commitDays(value: string) {
+		const n = parseInt(value, 10);
+		if (Number.isFinite(n) && n > 0 && n !== monthDays) onSetMatrixDays(n);
 	}
 
 	function openNote(habitId: string, date: string, clientX: number, clientY: number) {
@@ -131,59 +153,43 @@ export default function HabitMatrix({ habits, categories, logMap, monthDays, def
 		);
 	}
 
-	const isWeek = mode === 'week';
-	const gridTemplate = isWeek
-		? `minmax(80px, 1fr) repeat(${dates.length}, ${COL_WIDTH}px)`
-		: `${LABEL_WIDTH}px repeat(${dates.length}, ${COL_WIDTH}px)`;
+	const gridTemplate = `${LABEL_WIDTH}px repeat(${dates.length}, ${COL_WIDTH}px)`;
+	// Matches the grid's natural content width so the footer aligns with the
+	// displayed columns (label column through the last date column) rather
+	// than stretching to the full module width.
+	const contentWidth = LABEL_WIDTH + dates.length * (COL_WIDTH + GRID_GAP);
 
 	return (
 		<>
 		<div className="stratum-matrix">
-			<div className="stratum-matrix__toolbar">
-				<span className="stratum-matrix__title">Habit Matrix</span>
-				<div className="stratum-matrix__controls">
-					{mode === 'month' && (
-						<div className="stratum-matrix__pager">
-							<button title="Older" onClick={() => setPageOffset((o) => o + monthDays)}>‹</button>
-							<button title="Newer" disabled={pageOffset === 0} onClick={() => setPageOffset((o) => Math.max(0, o - monthDays))}>›</button>
-							<button title="Jump to today" disabled={pageOffset === 0} onClick={() => setPageOffset(0)}>Today</button>
-						</div>
-					)}
-					{hasArchived && (
-						<button
-							className={`stratum-btn stratum-btn--tiny ${showArchived ? 'stratum-btn--active' : ''}`}
-							onClick={() => setShowArchived((v) => !v)}
-							title="Toggle archived habits"
-						>
-							Archived
-						</button>
-					)}
-					<div className="stratum-matrix__toggle">
-						<button
-							className={mode === 'week' ? 'stratum-btn--active' : ''}
-							onClick={() => switchMode('week')}
-						>Week</button>
-						<button
-							className={mode === 'month' ? 'stratum-btn--active' : ''}
-							onClick={() => switchMode('month')}
-						>Month</button>
-					</div>
-				</div>
-			</div>
 			<div className="stratum-matrix__scroll" ref={scrollRef}>
 				<div
-					className={`stratum-matrix__grid ${isWeek ? 'stratum-matrix__grid--fill' : ''}`}
+					className="stratum-matrix__grid"
 					style={{ gridTemplateColumns: gridTemplate }}
 				>
 					{/* Header row */}
-					<div className="stratum-matrix__corner" />
+					<div className="stratum-matrix__corner">
+						<button className="stratum-matrix__nav-btn" title="Older" onClick={() => setPageOffset((o) => o + monthDays)}>
+							<IconChevronLeft />
+						</button>
+						{pageOffset !== 0 && (
+							<button className="stratum-matrix__nav-btn" title="Newer" onClick={() => setPageOffset((o) => Math.max(0, o - monthDays))}>
+								<IconChevronRight />
+							</button>
+						)}
+						{pageOffset !== 0 && (
+							<button className="stratum-matrix__nav-btn stratum-matrix__nav-btn--today" title="Jump to today" onClick={() => setPageOffset(0)}>
+								Today
+							</button>
+						)}
+					</div>
 					{dates.map((d, i) => (
 						<div
 							key={d}
 							className={`stratum-matrix__date-header ${d === todayStr ? 'stratum-matrix__date-header--today' : ''}`}
 						>
 							{d === todayStr && <span className="stratum-matrix__today-dot" />}
-							{formatHeader(d, mode, i)}
+							{formatHeader(d, i)}
 						</div>
 					))}
 					{/* Habit rows */}
@@ -229,6 +235,39 @@ export default function HabitMatrix({ habits, categories, logMap, monthDays, def
 						);
 					})}
 				</div>
+			</div>
+			<div className="stratum-matrix__footer" style={{ width: contentWidth, maxWidth: '100%' }}>
+				<button
+					className="stratum-matrix__footer-btn"
+					onClick={(e) => onQuickAddHabitAt(e.clientX, e.clientY)}
+					title="Add habit"
+				>
+					<IconPlus /> New habit
+				</button>
+				<div className="stratum-matrix__footer-spacer" />
+				{hasArchived && (
+					<button
+						className={`stratum-matrix__footer-btn ${showArchived ? 'stratum-matrix__footer-btn--active' : ''}`}
+						onClick={() => setShowArchived((v) => !v)}
+						title="Toggle archived habits"
+					>
+						{showArchived ? 'Hide archived' : 'Show archived'}
+					</button>
+				)}
+				{showDaysInput && (
+					<label className="stratum-matrix__days-input" title="Number of days shown in the matrix">
+						Show
+						<input
+							type="number"
+							min={1}
+							key={monthDays}
+							defaultValue={monthDays}
+							onBlur={(e) => commitDays(e.currentTarget.value)}
+							onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+						/>
+						days
+					</label>
+				)}
 			</div>
 		</div>
 		{notePopover && createPortal(

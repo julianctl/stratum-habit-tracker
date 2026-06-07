@@ -15,7 +15,89 @@
 	padding: 16px;
 	display: flex;
 	flex-direction: column;
+}
+
+/* --- Dashboard: draggable rows of modules --- */
+
+.stratum-dashboard {
+	display: flex;
+	flex-direction: column;
+}
+
+.stratum-dash-row {
+	display: flex;
+	flex-direction: column;
 	gap: 24px;
+}
+
+.stratum-dash-row:not(:last-child) {
+	margin-bottom: 20px;
+}
+
+.stratum-dash-row--split {
+	flex-direction: row;
+	align-items: flex-start;
+}
+
+.stratum-dash-row--split > .stratum-dash-module {
+	flex: 1;
+	min-width: 0;
+}
+
+.stratum-dash-module {
+	position: relative;
+}
+
+/* Module-target drops always result in a side-by-side placement, so the
+   indicator is a vertical edge regardless of the row's current layout. */
+.stratum-dash-module--drop-before {
+	box-shadow: -2px 0 0 var(--interactive-accent);
+}
+
+.stratum-dash-module--drop-after {
+	box-shadow: 2px 0 0 var(--interactive-accent);
+}
+
+.stratum-dash-module__header {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	margin: 0 0 8px;
+}
+
+.stratum-dash-module__title {
+	margin: 0;
+}
+
+.stratum-dash-module__handle {
+	padding: 0 2px;
+	font-size: 13px;
+	line-height: 1;
+	color: var(--text-faint);
+	cursor: grab;
+	opacity: 0;
+	transition: opacity 0.1s ease;
+	position: relative;
+	top: -2px;
+}
+
+.stratum-dash-module:hover .stratum-dash-module__handle {
+	opacity: 1;
+}
+
+.stratum-dash-strip {
+	/* Hit-box size stays constant across hover states — resizing it on hover
+	   would expand it over the neighboring module and keep capturing its
+	   dragover events, making the strip "stick" as the active target. */
+	height: 14px;
+	margin: -7px 0;
+	border-radius: 2px;
+	background: transparent;
+}
+
+.stratum-dash-strip--hover {
+	background: var(--interactive-accent);
+	opacity: 0.5;
 }
 
 .stratum-sidebar {
@@ -56,10 +138,6 @@
 }
 
 /* Leave room at the matrix toolbar's right edge for the floating toggle. */
-.stratum-app--compact .stratum-matrix__toolbar {
-	padding-right: 38px;
-}
-
 .stratum-sidebar-backdrop {
 	position: absolute;
 	inset: 0;
@@ -171,49 +249,6 @@
 }
 
 /* Habit Matrix */
-.stratum-matrix__toolbar {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	margin-bottom: 8px;
-}
-
-.stratum-matrix__title {
-	font-weight: 600;
-	font-size: var(--font-ui-medium);
-}
-
-.stratum-matrix__controls {
-	display: flex;
-	align-items: center;
-	gap: 8px;
-}
-
-.stratum-matrix__toggle,
-.stratum-matrix__pager {
-	display: flex;
-	gap: 4px;
-}
-
-.stratum-matrix__pager button {
-	background: var(--interactive-normal);
-	border: 1px solid var(--background-modifier-border);
-	border-radius: var(--radius-s);
-	color: var(--text-normal);
-	cursor: pointer;
-	font-size: var(--font-ui-small);
-	padding: 2px 8px;
-}
-
-.stratum-matrix__pager button:hover:not(:disabled) {
-	background: var(--interactive-hover);
-}
-
-.stratum-matrix__pager button:disabled {
-	opacity: 0.4;
-	cursor: default;
-}
-
 .stratum-matrix__scroll {
 	overflow-x: auto;
 	padding-top: 4px;
@@ -229,11 +264,6 @@
 	margin: 0 auto;
 }
 
-.stratum-matrix__grid--fill {
-	width: 100%;
-	margin: 0;
-}
-
 .stratum-matrix__corner,
 .stratum-matrix__habit-label {
 	position: sticky;
@@ -241,6 +271,36 @@
 	z-index: 2;
 	align-self: stretch;
 	background: var(--background-primary);
+}
+
+.stratum-matrix__corner {
+	display: flex;
+	align-items: center;
+	gap: 2px;
+}
+
+.stratum-matrix__nav-btn {
+	background: none !important;
+	border: none;
+	border-radius: var(--radius-s);
+	color: var(--text-faint);
+	cursor: pointer;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 3px;
+	line-height: 1;
+	box-shadow: none !important;
+}
+
+.stratum-matrix__nav-btn:hover {
+	background: var(--background-modifier-hover) !important;
+	color: var(--text-normal);
+}
+
+.stratum-matrix__nav-btn--today {
+	font-size: var(--font-ui-smaller);
+	padding: 3px 6px;
 }
 
 /* Right-edge gradient so the opaque name column blends into the cells */
@@ -306,6 +366,60 @@
 .stratum-matrix--empty p {
 	color: var(--text-muted);
 	font-size: var(--font-ui-small);
+}
+
+.stratum-matrix__footer {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	margin: 6px auto 0;
+	min-height: 0;
+}
+
+.stratum-matrix__footer-spacer {
+	flex: 1;
+}
+
+.stratum-matrix__footer-btn {
+	background: none !important;
+	border: none;
+	border-radius: var(--radius-s);
+	color: var(--text-faint) !important;
+	cursor: pointer;
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	font-size: var(--font-ui-smaller);
+	padding: 0 4px;
+	line-height: 1.2;
+	box-shadow: none !important;
+}
+
+.stratum-matrix__footer-btn:hover {
+	background: var(--background-modifier-hover) !important;
+	color: var(--text-normal) !important;
+}
+
+.stratum-matrix__footer-btn--active {
+	color: var(--text-normal) !important;
+}
+
+.stratum-matrix__days-input {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	font-size: var(--font-ui-smaller);
+	color: var(--text-faint);
+	white-space: nowrap;
+}
+
+.stratum-matrix__days-input input {
+	width: 36px;
+	height: 18px;
+	font-size: var(--font-ui-smaller);
+	line-height: 1;
+	padding: 0 3px;
+	text-align: center;
 }
 
 /* Matrix Cell */

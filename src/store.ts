@@ -1,13 +1,21 @@
 import { TFile } from 'obsidian';
 import type StratumPlugin from './main';
-import type { Category, Habit, HabitLog, PersistedStore, StratumData, Todo } from './types';
+import type { Category, DashboardRow, Habit, HabitLog, PersistedStore, StratumData, Todo } from './types';
 import { groupKey, normalizeGroupedHabits, todayISO, UNCATEGORIZED_KEY } from './utils';
+
+// Layout shown to first-time users and as a fallback when no layout is stored
+// yet (matches the previous fixed stacked arrangement).
+const DEFAULT_LAYOUT: DashboardRow[] = [
+	{ id: 'row-matrix', modules: [{ id: 'module-matrix', type: 'matrix' }] },
+	{ id: 'row-heatmap', modules: [{ id: 'module-heatmap', type: 'heatmap' }] },
+];
 
 const DEFAULT_DATA: StratumData = {
 	habits: [],
 	logs: [],
 	todos: [],
 	categories: [],
+	layout: DEFAULT_LAYOUT,
 };
 
 export class StratumStore {
@@ -39,7 +47,10 @@ export class StratumStore {
 			dailyNoteFolder: raw?.settings?.dailyNoteFolder ?? 'Stratum/Daily Notes',
 			heatmapColor: raw?.settings?.heatmapColor ?? '#a4968e',
 			heatmapHeight: raw?.settings?.heatmapHeight ?? 200,
+			heatmapDays: raw?.settings?.heatmapDays ?? 365,
+			showHeatmapDaysInput: raw?.settings?.showHeatmapDaysInput ?? true,
 			matrixDays: raw?.settings?.matrixDays ?? 50,
+			showMatrixDaysInput: raw?.settings?.showMatrixDaysInput ?? true,
 			matrixColorScheme: raw?.settings?.matrixColorScheme ?? 'stratum',
 			skipDeleteConfirm: raw?.settings?.skipDeleteConfirm ?? false,
 			groupByCategory: raw?.settings?.groupByCategory ?? true,
@@ -49,6 +60,10 @@ export class StratumStore {
 		const orderedHabits = settings.groupByCategory
 			? normalizeGroupedHabits(habits, categories)
 			: habits;
+		// Migration: installs predating the dashboard layout feature have no layout.
+		const layout: DashboardRow[] = raw?.data?.layout && raw.data.layout.length > 0
+			? raw.data.layout
+			: DEFAULT_LAYOUT;
 		return {
 			settings,
 			data: {
@@ -56,6 +71,7 @@ export class StratumStore {
 				logs: raw?.data?.logs ?? DEFAULT_DATA.logs,
 				todos: raw?.data?.todos ?? DEFAULT_DATA.todos,
 				categories,
+				layout,
 			},
 		};
 	}
@@ -390,6 +406,65 @@ export class StratumStore {
 
 	async deleteTodo(store: PersistedStore, id: string): Promise<PersistedStore> {
 		const next = { ...store, data: { ...store.data, todos: store.data.todos.filter((t) => t.id !== id) } };
+		await this.save(next);
+		return next;
+	}
+
+	// --- Dashboard layout ---
+
+	// Where a dragged module should land: either inserted into an existing row
+	// (before `beforeModuleId`, or appended if null), or moved into a brand new
+	// row positioned before `newRowBeforeId` (or appended at the end if null).
+	async moveModule(
+		store: PersistedStore,
+		moduleId: string,
+		destination: { rowId: string; beforeModuleId: string | null } | { newRowBeforeId: string | null },
+	): Promise<PersistedStore> {
+		const MAX_PER_ROW = 3;
+		const rows = store.data.layout;
+		const moving = rows.flatMap((r) => r.modules).find((m) => m.id === moduleId);
+		if (!moving) return store;
+
+		if ('rowId' in destination) {
+			const targetRow = rows.find((r) => r.id === destination.rowId);
+			if (!targetRow) return store;
+			const alreadyInRow = targetRow.modules.some((m) => m.id === moduleId);
+			if (!alreadyInRow && targetRow.modules.length >= MAX_PER_ROW) return store;
+		}
+
+		// Remove the mover from its current row, dropping any row left empty.
+		const withoutMover = rows
+			.map((row) => ({ ...row, modules: row.modules.filter((m) => m.id !== moduleId) }))
+			.filter((row) => row.modules.length > 0);
+
+		let layout: DashboardRow[];
+		if ('newRowBeforeId' in destination) {
+			const newRow: DashboardRow = { id: `row-${Date.now()}`, modules: [moving] };
+			const idx = destination.newRowBeforeId
+				? withoutMover.findIndex((r) => r.id === destination.newRowBeforeId)
+				: -1;
+			layout = idx === -1
+				? [...withoutMover, newRow]
+				: [...withoutMover.slice(0, idx), newRow, ...withoutMover.slice(idx)];
+		} else {
+			layout = withoutMover.map((row) => {
+				if (row.id !== destination.rowId) return row;
+				const modules = [...row.modules];
+				const insertIdx = destination.beforeModuleId
+					? modules.findIndex((m) => m.id === destination.beforeModuleId)
+					: -1;
+				if (insertIdx === -1) modules.push(moving);
+				else modules.splice(insertIdx, 0, moving);
+				return { ...row, modules };
+			});
+			// The mover was alone in the target row, so it got pruned away above —
+			// recreate it as a single-module row (a same-row no-op reorder).
+			if (!layout.some((r) => r.id === destination.rowId)) {
+				layout = [...layout, { id: destination.rowId, modules: [moving] }];
+			}
+		}
+
+		const next: PersistedStore = { ...store, data: { ...store.data, layout } };
 		await this.save(next);
 		return next;
 	}

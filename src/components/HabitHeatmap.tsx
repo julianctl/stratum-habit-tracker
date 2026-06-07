@@ -1,18 +1,21 @@
-import { cloneElement, useEffect, useMemo, useRef, type ReactElement, type SVGProps } from 'react';
+import { cloneElement, useEffect, useMemo, useRef, useState, type ReactElement, type SVGProps } from 'react';
 import CalendarHeatmap from 'react-calendar-heatmap';
 import type { Habit, HabitLog } from '../types';
-import { isHabitActiveOn } from '../utils';
+import { isHabitActiveOn, useHorizontalWheelScroll } from '../utils';
 
 interface HabitHeatmapProps {
 	habits: Habit[];
 	logs: HabitLog[];
 	color: string;
 	height: number;
+	days: number;
+	onSetDays: (days: number) => void;
+	showDaysInput: boolean;
 }
 
-function getYearAgo(): Date {
+function daysAgo(count: number): Date {
 	const d = new Date();
-	d.setFullYear(d.getFullYear() - 1);
+	d.setDate(d.getDate() - (count - 1));
 	return d;
 }
 
@@ -25,8 +28,27 @@ function levelClass(count: number, total: number): string {
 	return 'stratum-heatmap__cell--4';
 }
 
-export default function HabitHeatmap({ habits, logs, color, height }: HabitHeatmapProps) {
+export default function HabitHeatmap({ habits, logs, color, height, days, onSetDays, showDaysInput }: HabitHeatmapProps) {
 	const scrollRef = useRef<HTMLDivElement>(null);
+	useHorizontalWheelScroll(scrollRef);
+	const [contentWidth, setContentWidth] = useState<number>();
+
+	// Mirrors the matrix footer's alignment: track the rendered SVG's natural
+	// width so the footer lines up with the displayed heatmap, not the module.
+	useEffect(() => {
+		const el = scrollRef.current?.querySelector<HTMLElement>('.react-calendar-heatmap');
+		if (!el) return;
+		const measure = () => setContentWidth(el.getBoundingClientRect().width);
+		measure();
+		const ro = new ResizeObserver(measure);
+		ro.observe(el);
+		return () => ro.disconnect();
+	}, []);
+
+	function commitDays(value: string) {
+		const n = parseInt(value, 10);
+		if (Number.isFinite(n) && n > 0 && n !== days) onSetDays(n);
+	}
 
 	const values = useMemo(() => {
 		const counts = new Map<string, number>();
@@ -41,15 +63,14 @@ export default function HabitHeatmap({ habits, logs, color, height }: HabitHeatm
 	const activeCountByDate = useMemo(() => {
 		const map = new Map<string, number>();
 		const today = new Date();
-		const d = new Date(today);
-		d.setFullYear(d.getFullYear() - 1);
+		const d = daysAgo(days);
 		while (d <= today) {
 			const iso = d.toISOString().slice(0, 10);
 			map.set(iso, habits.filter((h) => isHabitActiveOn(h, iso)).length);
 			d.setDate(d.getDate() + 1);
 		}
 		return map;
-	}, [habits]);
+	}, [habits, days]);
 
 	// Default to the rightmost (most recent) and re-pin on resize. When the
 	// heatmap fully fits, scrollWidth === clientWidth so it stays centered (CSS).
@@ -74,10 +95,9 @@ export default function HabitHeatmap({ habits, logs, color, height }: HabitHeatm
 				.stratum-heatmap rect.stratum-heatmap__cell--4 { fill: ${color} !important; opacity: 1.0; }
 				.stratum-heatmap .react-calendar-heatmap { height: ${height}px !important; }
 			`}</style>
-			<h3 className="stratum-section-title">Year Overview</h3>
 			<div className="stratum-heatmap__scroll" ref={scrollRef}>
 				<CalendarHeatmap
-					startDate={getYearAgo()}
+					startDate={daysAgo(days)}
 					endDate={new Date()}
 					values={values}
 					classForValue={(value) => {
@@ -91,6 +111,23 @@ export default function HabitHeatmap({ habits, logs, color, height }: HabitHeatm
 					}
 				/>
 			</div>
+			{showDaysInput && (
+				<div className="stratum-matrix__footer" style={{ width: contentWidth, maxWidth: '100%' }}>
+					<div className="stratum-matrix__footer-spacer" />
+					<label className="stratum-matrix__days-input" title="Number of days shown in the heatmap">
+						Show
+						<input
+							type="number"
+							min={1}
+							key={days}
+							defaultValue={days}
+							onBlur={(e) => commitDays(e.currentTarget.value)}
+							onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+						/>
+						days
+					</label>
+				</div>
+			)}
 		</div>
 	);
 }

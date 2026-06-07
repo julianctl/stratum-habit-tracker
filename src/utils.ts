@@ -1,3 +1,4 @@
+import { useEffect, type RefObject } from 'react';
 import type { Category, Habit } from './types';
 
 export function todayISO(): string {
@@ -53,4 +54,28 @@ export function isHabitActiveOn(habit: Habit, date: string): boolean {
 export function isHabitCurrentlyActive(habit: Habit): boolean {
 	const last = habit.periods[habit.periods.length - 1];
 	return !!last && !last.endDate;
+}
+
+// Lets vertical wheel input drive horizontal scrolling on a horizontally
+// scrollable element, but only when the element has no internal vertical
+// overflow of its own to consume that input — so normal vertical scroll
+// areas (and the outer pane scroll) keep working as expected. Uses a native
+// listener because React's onWheel is passive and can't preventDefault.
+// Scales down the raw wheel delta so a single notch moves roughly two matrix
+// columns (~58px) rather than the ~116px a raw deltaY produces.
+const WHEEL_SCROLL_SCALE = 0.5;
+
+export function useHorizontalWheelScroll(ref: RefObject<HTMLElement | null>): void {
+	useEffect(() => {
+		const el = ref.current;
+		if (!el) return;
+		const onWheel = (e: WheelEvent) => {
+			if (e.deltaY !== 0 && el.scrollHeight <= el.clientHeight && el.scrollWidth > el.clientWidth) {
+				el.scrollLeft += e.deltaY * WHEEL_SCROLL_SCALE;
+				e.preventDefault();
+			}
+		};
+		el.addEventListener('wheel', onWheel, { passive: false });
+		return () => el.removeEventListener('wheel', onWheel);
+	}, [ref]);
 }
