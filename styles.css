@@ -15,90 +15,9 @@
 	padding: 16px;
 	display: flex;
 	flex-direction: column;
-}
-
-/* --- Dashboard: draggable rows of modules --- */
-
-.stratum-dashboard {
-	display: flex;
-	flex-direction: column;
-}
-
-.stratum-dash-row {
-	display: flex;
-	flex-direction: column;
 	gap: 24px;
 }
 
-.stratum-dash-row:not(:last-child) {
-	margin-bottom: 20px;
-}
-
-.stratum-dash-row--split {
-	flex-direction: row;
-	align-items: flex-start;
-}
-
-.stratum-dash-row--split > .stratum-dash-module {
-	flex: 1;
-	min-width: 0;
-}
-
-.stratum-dash-module {
-	position: relative;
-}
-
-/* Module-target drops always result in a side-by-side placement, so the
-   indicator is a vertical edge regardless of the row's current layout. */
-.stratum-dash-module--drop-before {
-	box-shadow: -2px 0 0 var(--interactive-accent);
-}
-
-.stratum-dash-module--drop-after {
-	box-shadow: 2px 0 0 var(--interactive-accent);
-}
-
-.stratum-dash-module__header {
-	display: flex;
-	align-items: center;
-	gap: 4px;
-	margin: 0 0 8px;
-}
-
-.stratum-dash-module__title {
-	margin: 0;
-}
-
-.stratum-dash-module__handle {
-	padding: 0 2px;
-	font-size: 13px;
-	line-height: 1;
-	color: var(--text-faint);
-	cursor: grab;
-	opacity: 0;
-	transition: opacity 0.1s ease;
-	position: relative;
-	top: -2px;
-}
-
-.stratum-dash-module:hover .stratum-dash-module__handle {
-	opacity: 1;
-}
-
-.stratum-dash-strip {
-	/* Hit-box size stays constant across hover states — resizing it on hover
-	   would expand it over the neighboring module and keep capturing its
-	   dragover events, making the strip "stick" as the active target. */
-	height: 14px;
-	margin: -7px 0;
-	border-radius: 2px;
-	background: transparent;
-}
-
-.stratum-dash-strip--hover {
-	background: var(--interactive-accent);
-	opacity: 0.5;
-}
 
 .stratum-sidebar {
 	width: 220px;

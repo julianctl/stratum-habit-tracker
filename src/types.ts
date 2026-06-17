@@ -31,26 +31,11 @@ export interface Todo {
 	dueDate?: string; // YYYY-MM-DD
 }
 
-// Dashboard layout: an ordered list of rows, each holding 1-3 modules
-// rendered side by side. Stacking modules = separate rows.
-export type ModuleType = 'matrix' | 'heatmap';
-
-export interface DashboardModule {
-	id: string;
-	type: ModuleType;
-}
-
-export interface DashboardRow {
-	id: string;
-	modules: DashboardModule[];
-}
-
 export interface StratumData {
 	habits: Habit[];
 	logs: HabitLog[];
 	todos: Todo[];
 	categories: Category[];
-	layout: DashboardRow[];
 }
 
 export interface StratumSettings {

@@ -3,8 +3,9 @@ import { createPortal } from 'react-dom';
 import type StratumPlugin from '../main';
 import type { HabitLog, PersistedStore } from '../types';
 import { normalizeGroupedHabits } from '../utils';
-import Dashboard, { type ModuleDestination } from './Dashboard';
 import HabitConfigMenu from './HabitConfigMenu';
+import HabitHeatmap from './HabitHeatmap';
+import HabitMatrix from './HabitMatrix';
 import Sidebar from './Sidebar';
 
 interface AppProps {
@@ -113,8 +114,6 @@ export default function App({ plugin }: AppProps) {
 		mutate((s) => plugin.store.unarchiveHabit(s, id, startDate));
 	const onSetHabitStartDate = (id: string, date: string) =>
 		mutate((s) => plugin.store.setHabitStartDate(s, id, date));
-	const onMoveModule = (moduleId: string, destination: ModuleDestination) =>
-		mutate((s) => plugin.store.moveModule(s, moduleId, destination));
 	const onSetSkipDeleteConfirm = (skip: boolean) => {
 		plugin.settings.skipDeleteConfirm = skip;
 		void plugin.saveSettings();
@@ -169,26 +168,27 @@ export default function App({ plugin }: AppProps) {
 		<>
 		<div className={`stratum-app ${compact ? 'stratum-app--compact' : ''}`} ref={rootRef}>
 			<main className="stratum-main">
-				<Dashboard
-					layout={store.data.layout}
+				<HabitMatrix
 					habits={habits}
 					categories={categories}
 					logMap={logMap}
-					logs={store.data.logs}
-					matrixDays={store.settings.matrixDays}
+					monthDays={store.settings.matrixDays}
 					defaultColor={store.settings.matrixColorScheme === 'stratum' ? '#a4968e' : undefined}
-					heatmapColor={store.settings.heatmapColor}
-					heatmapHeight={store.settings.heatmapHeight}
-					heatmapDays={store.settings.heatmapDays}
-					showMatrixDaysInput={store.settings.showMatrixDaysInput}
-					showHeatmapDaysInput={store.settings.showHeatmapDaysInput}
 					onToggleLog={onToggleLog}
 					onSetLogNote={onSetLogNote}
 					onHabitContextMenu={onHabitContextMenu}
 					onQuickAddHabitAt={onQuickAddHabitAt}
 					onSetMatrixDays={onSetMatrixDays}
-					onSetHeatmapDays={onSetHeatmapDays}
-					onMoveModule={onMoveModule}
+					showDaysInput={store.settings.showMatrixDaysInput}
+				/>
+				<HabitHeatmap
+					habits={habits}
+					logs={store.data.logs}
+					color={store.settings.heatmapColor}
+					height={store.settings.heatmapHeight}
+					days={store.settings.heatmapDays}
+					onSetDays={onSetHeatmapDays}
+					showDaysInput={store.settings.showHeatmapDaysInput}
 				/>
 			</main>
 			{compact && (
