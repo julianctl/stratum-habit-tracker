@@ -1,4 +1,4 @@
-import { Plugin } from 'obsidian';
+import { Platform, Plugin } from 'obsidian';
 import { StratumSettingTab } from './settings';
 import { StratumStore } from './store';
 import type { PersistedStore, StratumSettings } from './types';
@@ -44,7 +44,12 @@ export default class StratumPlugin extends Plugin {
 		const { workspace } = this.app;
 		let leaf = workspace.getLeavesOfType(VIEW_TYPE_STRATUM)[0];
 		if (!leaf) {
-			leaf = workspace.getRightLeaf(false) ?? workspace.getLeaf(true);
+			// Desktop/tablet default to the main area, like Graph View — the user
+			// can drag the tab into a sidebar themselves, and Obsidian's workspace
+			// layout persistence remembers it there on the next launch.
+			leaf = Platform.isPhone
+				? workspace.getRightLeaf(false) ?? workspace.getLeaf(true)
+				: workspace.getLeaf(true);
 			await leaf.setViewState({ type: VIEW_TYPE_STRATUM, active: true });
 		}
 		await workspace.revealLeaf(leaf);
