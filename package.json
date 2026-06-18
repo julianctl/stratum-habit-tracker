@@ -31,6 +31,7 @@
 	"dependencies": {
 		"react": "^19.2.7",
 		"react-calendar-heatmap": "^1.10.0",
-		"react-dom": "^19.2.7"
+		"react-dom": "^19.2.7",
+		"react-grid-layout": "^2.2.3"
 	}
 }

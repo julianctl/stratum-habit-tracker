@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type StratumPlugin from '../main';
-import type { HabitLog, PersistedStore } from '../types';
+import type { GridItem, HabitLog, PersistedStore } from '../types';
 import { normalizeGroupedHabits } from '../utils';
-import Dashboard, { type ModuleDestination } from './Dashboard';
+import Dashboard from './Dashboard';
 import HabitConfigMenu from './HabitConfigMenu';
 import Sidebar from './Sidebar';
 
@@ -113,8 +113,8 @@ export default function App({ plugin }: AppProps) {
 		mutate((s) => plugin.store.unarchiveHabit(s, id, startDate));
 	const onSetHabitStartDate = (id: string, date: string) =>
 		mutate((s) => plugin.store.setHabitStartDate(s, id, date));
-	const onMoveModule = (moduleId: string, destination: ModuleDestination) =>
-		mutate((s) => plugin.store.moveModule(s, moduleId, destination));
+	const onSaveLayout = (layout: GridItem[]) =>
+		mutate((s) => plugin.store.saveLayout(s, layout));
 	const onSetSkipDeleteConfirm = (skip: boolean) => {
 		plugin.settings.skipDeleteConfirm = skip;
 		void plugin.saveSettings();
@@ -178,7 +178,6 @@ export default function App({ plugin }: AppProps) {
 					matrixDays={store.settings.matrixDays}
 					defaultColor={store.settings.matrixColorScheme === 'stratum' ? '#a4968e' : undefined}
 					heatmapColor={store.settings.heatmapColor}
-					heatmapHeight={store.settings.heatmapHeight}
 					heatmapDays={store.settings.heatmapDays}
 					showMatrixDaysInput={store.settings.showMatrixDaysInput}
 					showHeatmapDaysInput={store.settings.showHeatmapDaysInput}
@@ -188,7 +187,7 @@ export default function App({ plugin }: AppProps) {
 					onQuickAddHabitAt={onQuickAddHabitAt}
 					onSetMatrixDays={onSetMatrixDays}
 					onSetHeatmapDays={onSetHeatmapDays}
-					onMoveModule={onMoveModule}
+					onSaveLayout={onSaveLayout}
 				/>
 			</main>
 			{compact && (

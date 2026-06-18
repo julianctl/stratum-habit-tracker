@@ -7,7 +7,6 @@ interface HabitHeatmapProps {
 	habits: Habit[];
 	logs: HabitLog[];
 	color: string;
-	height: number;
 	days: number;
 	onSetDays: (days: number) => void;
 	showDaysInput: boolean;
@@ -28,7 +27,7 @@ function levelClass(count: number, total: number): string {
 	return 'stratum-heatmap__cell--4';
 }
 
-export default function HabitHeatmap({ habits, logs, color, height, days, onSetDays, showDaysInput }: HabitHeatmapProps) {
+export default function HabitHeatmap({ habits, logs, color, days, onSetDays, showDaysInput }: HabitHeatmapProps) {
 	const scrollRef = useRef<HTMLDivElement>(null);
 	useHorizontalWheelScroll(scrollRef);
 	const [contentWidth, setContentWidth] = useState<number>();
@@ -93,7 +92,7 @@ export default function HabitHeatmap({ habits, logs, color, height, days, onSetD
 				.stratum-heatmap rect.stratum-heatmap__cell--2 { fill: ${color} !important; opacity: 0.50; }
 				.stratum-heatmap rect.stratum-heatmap__cell--3 { fill: ${color} !important; opacity: 0.75; }
 				.stratum-heatmap rect.stratum-heatmap__cell--4 { fill: ${color} !important; opacity: 1.0; }
-				.stratum-heatmap .react-calendar-heatmap { height: ${height}px !important; }
+				.stratum-heatmap .react-calendar-heatmap { height: 180px !important; }
 			`}</style>
 			<div className="stratum-heatmap__scroll" ref={scrollRef}>
 				<CalendarHeatmap
