@@ -48,20 +48,6 @@ export class StratumSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
-			.setName('Year overview height (px)')
-			.setDesc('Height of the year overview heatmap in pixels.')
-			.addText((text) =>
-				text
-					.setPlaceholder('200')
-					.setValue(String(this.plugin.settings.heatmapHeight))
-					.onChange(async (value) => {
-						const n = parseInt(value, 10);
-						this.plugin.settings.heatmapHeight = Number.isFinite(n) && n > 0 ? n : 200;
-						await this.plugin.saveSettings();
-					}),
-			);
-
-		new Setting(containerEl)
 			.setName('Heatmap range (days)')
 			.setDesc('Default number of days shown in the habit heatmap (today at the right). You can sync this from the heatmap footer too.')
 			.addText((text) =>

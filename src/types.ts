@@ -31,17 +31,29 @@ export interface Todo {
 	dueDate?: string; // YYYY-MM-DD
 }
 
+// Serialisable form of a react-grid-layout LayoutItem, stored in data.json.
+// Matches the LayoutItem interface so it can be passed to RGL directly.
+export interface GridItem {
+	i: string;   // module id ('matrix' | 'heatmap')
+	x: number;
+	y: number;
+	w: number;
+	h: number;
+	minW?: number;
+	minH?: number;
+}
+
 export interface StratumData {
 	habits: Habit[];
 	logs: HabitLog[];
 	todos: Todo[];
 	categories: Category[];
+	layout: GridItem[];
 }
 
 export interface StratumSettings {
 	dailyNoteFolder: string;
 	heatmapColor: string;
-	heatmapHeight: number;
 	heatmapDays: number;
 	showHeatmapDaysInput: boolean;
 	matrixDays: number;

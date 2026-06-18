@@ -1,13 +1,22 @@
 import { TFile } from 'obsidian';
 import type StratumPlugin from './main';
-import type { Category, Habit, HabitLog, PersistedStore, StratumData, Todo } from './types';
+import type { Category, GridItem, Habit, HabitLog, PersistedStore, StratumData, Todo } from './types';
 import { groupKey, normalizeGroupedHabits, todayISO, UNCATEGORIZED_KEY } from './utils';
+
+export const DEFAULT_LAYOUT: GridItem[] = [
+	{ i: 'matrix',      x: 0, y: 0,  w: 12, h: 12, minW: 3, minH: 4 },
+	{ i: 'heatmap',     x: 0, y: 12, w: 12, h: 8,  minW: 3, minH: 3 },
+	{ i: 'test_yellow', x: 0, y: 20, w: 4,  h: 6,  minW: 1, minH: 1 },
+	{ i: 'test_blue',   x: 4, y: 20, w: 4,  h: 6,  minW: 1, minH: 1 },
+	{ i: 'test_red',    x: 8, y: 20, w: 4,  h: 6,  minW: 1, minH: 1 },
+];
 
 const DEFAULT_DATA: StratumData = {
 	habits: [],
 	logs: [],
 	todos: [],
 	categories: [],
+	layout: DEFAULT_LAYOUT,
 };
 
 export class StratumStore {
@@ -38,7 +47,6 @@ export class StratumStore {
 		const settings = {
 			dailyNoteFolder: raw?.settings?.dailyNoteFolder ?? 'Stratum/Daily Notes',
 			heatmapColor: raw?.settings?.heatmapColor ?? '#a4968e',
-			heatmapHeight: raw?.settings?.heatmapHeight ?? 200,
 			heatmapDays: raw?.settings?.heatmapDays ?? 365,
 			showHeatmapDaysInput: raw?.settings?.showHeatmapDaysInput ?? true,
 			matrixDays: raw?.settings?.matrixDays ?? 50,
@@ -52,6 +60,12 @@ export class StratumStore {
 		const orderedHabits = settings.groupByCategory
 			? normalizeGroupedHabits(habits, categories)
 			: habits;
+		// Validate that stored layout items are in the RGL format (have i/x/y/w/h).
+		// Old DnD format (id/modules) would pass the length check but break RGL.
+		const rawLayout: unknown[] = raw?.data?.layout ?? [];
+		const isValidRGLLayout = rawLayout.length > 0 &&
+			rawLayout.every((item) => typeof (item as Record<string, unknown>).i === 'string' && typeof (item as Record<string, unknown>).x === 'number');
+		const layout: GridItem[] = isValidRGLLayout ? (rawLayout as GridItem[]) : DEFAULT_LAYOUT;
 		return {
 			settings,
 			data: {
@@ -59,6 +73,7 @@ export class StratumStore {
 				logs: raw?.data?.logs ?? DEFAULT_DATA.logs,
 				todos: raw?.data?.todos ?? DEFAULT_DATA.todos,
 				categories,
+				layout,
 			},
 		};
 	}
@@ -393,6 +408,14 @@ export class StratumStore {
 
 	async deleteTodo(store: PersistedStore, id: string): Promise<PersistedStore> {
 		const next = { ...store, data: { ...store.data, todos: store.data.todos.filter((t) => t.id !== id) } };
+		await this.save(next);
+		return next;
+	}
+
+	// --- Dashboard layout ---
+
+	async saveLayout(store: PersistedStore, layout: GridItem[]): Promise<PersistedStore> {
+		const next: PersistedStore = { ...store, data: { ...store.data, layout } };
 		await this.save(next);
 		return next;
 	}
