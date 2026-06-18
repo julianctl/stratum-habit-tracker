@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode, type SVGProps } from 'react';
 import GridLayout, { useContainerWidth, type EventCallback, type Layout } from 'react-grid-layout';
+import { DEFAULT_LAYOUT } from '../store';
 import type { Category, GridItem, Habit, HabitLog } from '../types';
 import HabitHeatmap from './HabitHeatmap';
 import HabitMatrix from './HabitMatrix';
@@ -43,6 +44,22 @@ function IconGrip(props: SVGProps<SVGSVGElement>) {
 	);
 }
 
+function IconX(props: SVGProps<SVGSVGElement>) {
+	return (
+		<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+			<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+		</svg>
+	);
+}
+
+function IconPlus(props: SVGProps<SVGSVGElement>) {
+	return (
+		<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+			<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+		</svg>
+	);
+}
+
 const MODULE_TITLES: Record<string, string> = {
 	matrix:      'Habit Matrix',
 	heatmap:     'Habit Heatmap',
@@ -57,6 +74,23 @@ const TEST_MODULE_COLORS: Record<string, string> = {
 	test_blue:   '#4A7FA5',
 	test_red:    '#B85450',
 };
+
+// Registry of every known module, used to populate the "+ New Widget" list
+// with whichever ones aren't currently in the layout.
+interface ModuleCatalogEntry {
+	id: string;
+	title: string;
+	w: number;
+	h: number;
+	minW?: number;
+	minH?: number;
+}
+
+const MODULE_CATALOG: ModuleCatalogEntry[] = DEFAULT_LAYOUT.map(({ i, w, h, minW, minH }) => ({
+	id: i,
+	title: MODULE_TITLES[i] ?? i,
+	w, h, minW, minH,
+}));
 
 function toGridItems(layout: Layout): GridItem[] {
 	return layout.map(({ i, x, y, w, h, minW, minH }) => ({ i, x, y, w, h, minW, minH }));
@@ -112,6 +146,22 @@ export default function Dashboard({
 }: DashboardProps) {
 	const { containerRef, width } = useContainerWidth();
 	const [localLayout, setLocalLayout] = useState<GridItem[]>(layout);
+	const [addMenuOpen, setAddMenuOpen] = useState(false);
+	const addMenuRef = useRef<HTMLDivElement>(null);
+
+	useEffect(() => {
+		if (!addMenuOpen) return;
+		const onMouseDown = (e: MouseEvent) => {
+			if (addMenuRef.current && !addMenuRef.current.contains(e.target as Node)) setAddMenuOpen(false);
+		};
+		const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') setAddMenuOpen(false); };
+		activeDocument.addEventListener('mousedown', onMouseDown);
+		activeDocument.addEventListener('keydown', onKeyDown);
+		return () => {
+			activeDocument.removeEventListener('mousedown', onMouseDown);
+			activeDocument.removeEventListener('keydown', onKeyDown);
+		};
+	}, [addMenuOpen]);
 
 	// Track previous habit count to detect additions and grow the matrix item.
 	const prevHabitCount = useRef(habits.length);
@@ -208,6 +258,30 @@ export default function Dashboard({
 		setLocalLayout((prev) => prev.map((it) => it.i === item.i ? { ...it, h: item.h, w: item.w } : it));
 	};
 
+	// Removing a module only hides it (drops it from the layout) — its
+	// underlying data (habits, logs, etc.) is untouched and it reappears via
+	// "+ New Widget".
+	function handleDeleteModule(id: string) {
+		const next = localLayout.filter((it) => it.i !== id);
+		setLocalLayout(next);
+		onSaveLayout(next);
+	}
+
+	// Appends the module as a new row below everything else, at its catalog
+	// default size, so it can never collide with existing modules.
+	function handleAddModule(id: string) {
+		const def = MODULE_CATALOG.find((m) => m.id === id);
+		if (!def) return;
+		const y = localLayout.reduce((max, it) => Math.max(max, it.y + it.h), 0);
+		const newItem: GridItem = { i: def.id, x: 0, y, w: def.w, h: def.h, minW: def.minW, minH: def.minH };
+		const next = [...localLayout, newItem];
+		setLocalLayout(next);
+		onSaveLayout(next);
+		setAddMenuOpen(false);
+	}
+
+	const hiddenModules = MODULE_CATALOG.filter((m) => !localLayout.some((it) => it.i === m.id));
+
 	return (
 		<div ref={containerRef}>
 			<GridLayout
@@ -224,9 +298,18 @@ export default function Dashboard({
 				{localLayout.map((item) => (
 					<div key={item.i} className="stratum-dash-module">
 						<div className="stratum-dash-module__header">
-							<span className="stratum-dash-handle stratum-dash-module__handle" title="Drag to rearrange">
-								<IconGrip />
-							</span>
+							<div className="stratum-dash-module__handle-col">
+								<span className="stratum-dash-handle stratum-dash-module__handle" title="Drag to rearrange">
+									<IconGrip />
+								</span>
+								<button
+									className="stratum-dash-module__delete"
+									title="Remove module"
+									onClick={() => handleDeleteModule(item.i)}
+								>
+									<IconX />
+								</button>
+							</div>
 							<span className="stratum-section-title stratum-dash-module__title">
 								{MODULE_TITLES[item.i] ?? item.i}
 							</span>
@@ -237,6 +320,29 @@ export default function Dashboard({
 					</div>
 				))}
 			</GridLayout>
+			<div className="stratum-dash-add-row" ref={addMenuRef}>
+				<button
+					className="stratum-dash-add-btn"
+					onClick={() => setAddMenuOpen((o) => !o)}
+					disabled={hiddenModules.length === 0}
+				>
+					<IconPlus />
+					<span>New Widget</span>
+				</button>
+				{addMenuOpen && hiddenModules.length > 0 && (
+					<div className="stratum-dash-add-menu">
+						{hiddenModules.map((m) => (
+							<button
+								key={m.id}
+								className="stratum-dash-add-menu__item"
+								onClick={() => handleAddModule(m.id)}
+							>
+								{m.title}
+							</button>
+						))}
+					</div>
+				)}
+			</div>
 		</div>
 	);
 }

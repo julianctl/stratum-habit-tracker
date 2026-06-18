@@ -59,6 +59,44 @@
 	opacity: 1;
 }
 
+/* Sizes to the handle only (the delete button below is absolutely positioned,
+   so it doesn't affect this wrapper's height / the header's center-alignment). */
+.stratum-dash-module__handle-col {
+	position: relative;
+	flex-shrink: 0;
+}
+
+/* Anchored just below the handle, same 18px width, hidden until module hover. */
+.stratum-dash-module__delete {
+	position: absolute;
+	top: 100%;
+	left: 0;
+	margin-top: 2px;
+	width: 18px;
+	height: 18px;
+	padding: 3px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background: none !important;
+	border: none;
+	border-radius: var(--radius-s);
+	color: #5f5f5f !important;
+	cursor: pointer;
+	opacity: 0;
+	box-shadow: none !important;
+	transition: opacity 0.1s ease, background 0.1s ease, color 0.1s ease;
+}
+
+.stratum-dash-module:hover .stratum-dash-module__delete {
+	opacity: 1;
+}
+
+.stratum-dash-module__delete:hover {
+	background: var(--background-modifier-error) !important;
+	color: var(--text-on-accent) !important;
+}
+
 /* Left edge of content aligns with left edge of the title text.
    handle (14px svg + 2px padding each side = 18px) + gap (4px) = 22px offset
    from the module's own 8px left padding → 22px extra left padding here. */
@@ -999,3 +1037,70 @@
 }
 
 .stratum-heatmap rect.stratum-heatmap__cell--empty { fill: var(--background-modifier-form-field) !important; }
+
+/* Add-widget row, below the bottom-most dashboard module */
+.stratum-dash-add-row {
+	position: relative;
+	display: flex;
+	justify-content: center;
+	margin-top: 14px;
+}
+
+.stratum-dash-add-btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	background: none !important;
+	border: none;
+	border-radius: var(--radius-s);
+	color: var(--text-faint);
+	cursor: pointer;
+	font-size: var(--font-ui-small);
+	padding: 4px 10px;
+	box-shadow: none !important;
+	transition: background 0.1s ease, color 0.1s ease;
+}
+
+.stratum-dash-add-btn:hover:not(:disabled) {
+	background: var(--background-modifier-hover) !important;
+	color: var(--text-normal);
+}
+
+.stratum-dash-add-btn:disabled {
+	opacity: 0.4;
+	cursor: default;
+}
+
+.stratum-dash-add-menu {
+	position: absolute;
+	top: 100%;
+	left: 50%;
+	transform: translateX(-50%);
+	margin-top: 4px;
+	z-index: 20;
+	min-width: 160px;
+	background: var(--background-primary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-m);
+	box-shadow: var(--shadow-l);
+	padding: 4px;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.stratum-dash-add-menu__item {
+	background: none;
+	border: none;
+	border-radius: var(--radius-s);
+	color: var(--text-normal);
+	cursor: pointer;
+	font-size: var(--font-ui-small);
+	padding: 6px 10px;
+	text-align: left;
+	white-space: nowrap;
+}
+
+.stratum-dash-add-menu__item:hover {
+	background: var(--background-modifier-hover);
+}
