@@ -1,9 +1,11 @@
-import { useEffect, useRef, useState, type ReactNode, type SVGProps } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type SVGProps } from 'react';
 import GridLayout, { useContainerWidth, type EventCallback, type Layout } from 'react-grid-layout';
 import { DEFAULT_LAYOUT } from '../store';
-import type { Category, GridItem, Habit, HabitLog } from '../types';
+import type { Category, GridItem, Habit, HabitLog, StickyNote, Todo } from '../types';
 import HabitHeatmap from './HabitHeatmap';
 import HabitMatrix from './HabitMatrix';
+import StickyNoteModule from './StickyNoteModule';
+import TodoModule from './TodoModule';
 
 const ROW_HEIGHT = 25;
 const ROW_MARGIN = 10;
@@ -60,19 +62,24 @@ function IconPlus(props: SVGProps<SVGSVGElement>) {
 	);
 }
 
-const MODULE_TITLES: Record<string, string> = {
-	matrix:      'Habit Matrix',
-	heatmap:     'Habit Heatmap',
-	// TODO: remove test modules before release
-	test_yellow: 'Test Yellow',
-	test_blue:   'Test Blue',
-	test_red:    'Test Red',
-};
+function IconGear(props: SVGProps<SVGSVGElement>) {
+	return (
+		<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+			<circle cx="12" cy="12" r="3"/>
+			<path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+		</svg>
+	);
+}
 
-const TEST_MODULE_COLORS: Record<string, string> = {
-	test_yellow: '#C9A84C',
-	test_blue:   '#4A7FA5',
-	test_red:    '#B85450',
+const STICKY_PREFIX = 'sticky_';
+
+// Modules that expose a configuration panel (sticky notes use prefix check instead).
+const CONFIGURABLE_MODULES = new Set(['matrix', 'todo']);
+
+const MODULE_TITLES: Record<string, string> = {
+	matrix:  'Habit Matrix',
+	heatmap: 'Habit Heatmap',
+	todo:    'To-Do List',
 };
 
 // Registry of every known module, used to populate the "+ New Widget" list
@@ -102,6 +109,8 @@ interface DashboardProps {
 	categories: Category[];
 	logMap: Map<string, HabitLog>;
 	logs: HabitLog[];
+	todos: Todo[];
+	stickyNotes: StickyNote[];
 	matrixDays: number;
 	defaultColor?: string;
 	heatmapColor: string;
@@ -115,22 +124,49 @@ interface DashboardProps {
 	onSetMatrixDays: (days: number) => void;
 	onSetHeatmapDays: (days: number) => void;
 	onSaveLayout: (layout: GridItem[]) => void;
+	onAddTodo: (title: string, dueDate?: string) => void;
+	onToggleTodo: (id: string) => void;
+	onDeleteTodo: (id: string) => void;
+	onAddStickyNote: () => Promise<string>;
+	onDeleteStickyNote: (id: string) => void;
+	canAddStickyNote: boolean;
+	configModuleId: string | null;
+	onOpenConfig: (moduleId: string | null) => void;
+	todoShowCompleted: boolean;
 }
 
 // Scaled wrapper: renders children at natural size then scales to fit availableHeight.
+// naturalHeight is used only as an initial estimate; the actual content height is
+// measured via scrollHeight (unaffected by CSS transform) and used for all scaling.
 function ScaledContent({ naturalHeight, availableHeight, children }: {
 	naturalHeight: number;
 	availableHeight: number;
 	children: ReactNode;
 }) {
-	const scale = availableHeight > 0 ? availableHeight / naturalHeight : 1;
+	const innerRef = useRef<HTMLDivElement>(null);
+	const [contentHeight, setContentHeight] = useState(naturalHeight);
+
+	useLayoutEffect(() => {
+		const el = innerRef.current;
+		if (!el) return;
+		const measure = () => {
+			const h = el.scrollHeight;
+			if (h > 0) setContentHeight(h);
+		};
+		measure();
+		const ro = new ResizeObserver(measure);
+		ro.observe(el);
+		return () => ro.disconnect();
+	}, []);
+
+	const scale = availableHeight > 0 ? availableHeight / contentHeight : 1;
 	return (
 		<div style={{ height: availableHeight, overflow: 'hidden' }}>
-			<div style={{
+			<div ref={innerRef} style={{
 				transformOrigin: 'top left',
 				transform: `scale(${scale})`,
 				width: `${100 / scale}%`,
-				height: naturalHeight,
+				height: contentHeight,
 			}}>
 				{children}
 			</div>
@@ -139,14 +175,18 @@ function ScaledContent({ naturalHeight, availableHeight, children }: {
 }
 
 export default function Dashboard({
-	layout, habits, categories, logMap, logs, matrixDays, defaultColor,
+	layout, habits, categories, logMap, logs, todos, stickyNotes, matrixDays, defaultColor,
 	heatmapColor, heatmapDays, showMatrixDaysInput, showHeatmapDaysInput,
 	onToggleLog, onSetLogNote, onHabitContextMenu, onQuickAddHabitAt,
 	onSetMatrixDays, onSetHeatmapDays, onSaveLayout,
+	onAddTodo, onToggleTodo, onDeleteTodo,
+	onAddStickyNote, onDeleteStickyNote, canAddStickyNote,
+	configModuleId, onOpenConfig, todoShowCompleted,
 }: DashboardProps) {
 	const { containerRef, width } = useContainerWidth();
 	const [localLayout, setLocalLayout] = useState<GridItem[]>(layout);
 	const [addMenuOpen, setAddMenuOpen] = useState(false);
+	const [matrixShowArchived, setMatrixShowArchived] = useState(false);
 	const addMenuRef = useRef<HTMLDivElement>(null);
 
 	useEffect(() => {
@@ -199,7 +239,8 @@ export default function Dashboard({
 		switch (id) {
 			case 'matrix': {
 				const activeHabits = habits.filter((h) => h.periods.some((p) => !p.endDate));
-				const naturalPx = matrixNaturalPx(activeHabits.length);
+				const visibleCount = matrixShowArchived ? habits.length : activeHabits.length;
+				const naturalPx = matrixNaturalPx(visibleCount);
 				return (
 					<ScaledContent naturalHeight={naturalPx} availableHeight={availablePx}>
 						<HabitMatrix
@@ -214,10 +255,22 @@ export default function Dashboard({
 							onQuickAddHabitAt={onQuickAddHabitAt}
 							onSetMatrixDays={onSetMatrixDays}
 							showDaysInput={showMatrixDaysInput}
+							showArchived={matrixShowArchived}
+							onSetShowArchived={setMatrixShowArchived}
 						/>
 					</ScaledContent>
 				);
 			}
+			case 'todo':
+				return (
+					<TodoModule
+						todos={todos}
+						showCompleted={todoShowCompleted}
+						onAdd={onAddTodo}
+						onToggle={onToggleTodo}
+						onDelete={onDeleteTodo}
+					/>
+				);
 			case 'heatmap':
 				return (
 					<ScaledContent naturalHeight={HEATMAP_NATURAL_PX} availableHeight={availablePx}>
@@ -231,18 +284,13 @@ export default function Dashboard({
 						/>
 					</ScaledContent>
 				);
-			default:
-				if (id in TEST_MODULE_COLORS) {
-					return (
-						<div style={{
-							width: '100%', height: '100%',
-							background: TEST_MODULE_COLORS[id],
-							borderRadius: 'var(--radius-m)',
-							opacity: 0.4,
-						}} />
-					);
+			default: {
+				if (id.startsWith(STICKY_PREFIX)) {
+					const note = stickyNotes.find((n) => n.id === id.slice(STICKY_PREFIX.length));
+					if (note) return <StickyNoteModule note={note} />;
 				}
 				return null;
+			}
 		}
 	}
 
@@ -258,10 +306,8 @@ export default function Dashboard({
 		setLocalLayout((prev) => prev.map((it) => it.i === item.i ? { ...it, h: item.h, w: item.w } : it));
 	};
 
-	// Removing a module only hides it (drops it from the layout) — its
-	// underlying data (habits, logs, etc.) is untouched and it reappears via
-	// "+ New Widget".
 	function handleDeleteModule(id: string) {
+		if (id.startsWith(STICKY_PREFIX)) onDeleteStickyNote(id.slice(STICKY_PREFIX.length));
 		const next = localLayout.filter((it) => it.i !== id);
 		setLocalLayout(next);
 		onSaveLayout(next);
@@ -270,6 +316,20 @@ export default function Dashboard({
 	// Appends the module as a new row below everything else, at its catalog
 	// default size, so it can never collide with existing modules.
 	function handleAddModule(id: string) {
+		if (id === '__new_sticky__') {
+			void (async () => {
+				const moduleId = await onAddStickyNote();
+				setLocalLayout((prev) => {
+					const y = prev.reduce((max, it) => Math.max(max, it.y + it.h), 0);
+					const newItem: GridItem = { i: moduleId, x: 0, y, w: 4, h: 8, minW: 2, minH: 3 };
+					const next = [...prev, newItem];
+					onSaveLayout(next);
+					return next;
+				});
+			})();
+			setAddMenuOpen(false);
+			return;
+		}
 		const def = MODULE_CATALOG.find((m) => m.id === id);
 		if (!def) return;
 		const y = localLayout.reduce((max, it) => Math.max(max, it.y + it.h), 0);
@@ -281,6 +341,7 @@ export default function Dashboard({
 	}
 
 	const hiddenModules = MODULE_CATALOG.filter((m) => !localLayout.some((it) => it.i === m.id));
+	const showAddMenu = hiddenModules.length > 0 || canAddStickyNote;
 
 	return (
 		<div ref={containerRef}>
@@ -309,9 +370,20 @@ export default function Dashboard({
 								>
 									<IconX />
 								</button>
+								{(CONFIGURABLE_MODULES.has(item.i) || item.i.startsWith(STICKY_PREFIX)) && (
+									<button
+										className={`stratum-dash-module__config${configModuleId === item.i ? ' stratum-dash-module__config--active' : ''}`}
+										title="Configure module"
+										onClick={() => onOpenConfig(configModuleId === item.i ? null : item.i)}
+									>
+										<IconGear />
+									</button>
+								)}
 							</div>
 							<span className="stratum-section-title stratum-dash-module__title">
-								{MODULE_TITLES[item.i] ?? item.i}
+								{item.i.startsWith(STICKY_PREFIX)
+									? (stickyNotes.find((n) => n.id === item.i.slice(STICKY_PREFIX.length))?.title ?? 'Sticky Note')
+									: (MODULE_TITLES[item.i] ?? item.i)}
 							</span>
 						</div>
 						<div className="stratum-dash-module__content">
@@ -324,12 +396,12 @@ export default function Dashboard({
 				<button
 					className="stratum-dash-add-btn"
 					onClick={() => setAddMenuOpen((o) => !o)}
-					disabled={hiddenModules.length === 0}
+					disabled={!showAddMenu}
 				>
 					<IconPlus />
 					<span>New Widget</span>
 				</button>
-				{addMenuOpen && hiddenModules.length > 0 && (
+				{addMenuOpen && showAddMenu && (
 					<div className="stratum-dash-add-menu">
 						{hiddenModules.map((m) => (
 							<button
@@ -340,6 +412,14 @@ export default function Dashboard({
 								{m.title}
 							</button>
 						))}
+						{canAddStickyNote && (
+							<button
+								className="stratum-dash-add-menu__item"
+								onClick={() => handleAddModule('__new_sticky__')}
+							>
+								Sticky Note
+							</button>
+						)}
 					</div>
 				)}
 			</div>

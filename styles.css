@@ -97,6 +97,38 @@
 	color: var(--text-on-accent) !important;
 }
 
+/* Gear button: same absolute column as delete, positioned below it. */
+.stratum-dash-module__config {
+	position: absolute;
+	top: calc(100% + 22px);
+	left: 0;
+	width: 18px;
+	height: 18px;
+	padding: 3px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background: none !important;
+	border: none;
+	border-radius: var(--radius-s);
+	color: #5f5f5f !important;
+	cursor: pointer;
+	opacity: 0;
+	box-shadow: none !important;
+	transition: opacity 0.1s ease, background 0.1s ease, color 0.1s ease;
+}
+
+.stratum-dash-module:hover .stratum-dash-module__config {
+	opacity: 1;
+}
+
+.stratum-dash-module__config:hover,
+.stratum-dash-module__config--active {
+	background: var(--interactive-accent) !important;
+	color: var(--text-on-accent) !important;
+	opacity: 1;
+}
+
 /* Left edge of content aligns with left edge of the title text.
    handle (14px svg + 2px padding each side = 18px) + gap (4px) = 22px offset
    from the module's own 8px left padding → 22px extra left padding here. */
@@ -107,72 +139,118 @@
 	padding: 0 11px 0 22px;
 }
 
-.stratum-sidebar {
+.stratum-config-panel {
 	width: 220px;
-	min-width: 180px;
+	flex-shrink: 0;
 	border-left: 1px solid var(--background-modifier-border);
 	overflow-y: auto;
 }
 
-.stratum-sidebar-content {
+.stratum-config-panel__content {
 	padding: 12px;
 	display: flex;
 	flex-direction: column;
 	gap: 20px;
 }
 
-/* Compact mode: sidebar floats over the content instead of docking. */
-.stratum-app--compact .stratum-sidebar {
-	position: absolute;
-	top: 0;
-	right: 0;
-	bottom: 0;
-	width: min(85%, 260px);
-	min-width: 0;
-	z-index: 15;
-	background: var(--background-primary);
-	box-shadow: -4px 0 16px rgba(0, 0, 0, 0.35);
-	transform: translateX(100%);
-	transition: transform 0.2s ease;
-}
-
-.stratum-app--compact .stratum-sidebar.stratum-sidebar--open {
-	transform: translateX(0);
-}
-
-.stratum-app--compact .stratum-sidebar-content {
-	padding-top: 44px;
-}
-
-/* Leave room at the matrix toolbar's right edge for the floating toggle. */
-.stratum-sidebar-backdrop {
-	position: absolute;
-	inset: 0;
-	z-index: 14;
-	background: rgba(0, 0, 0, 0.35);
-}
-
-.stratum-sidebar-toggle {
-	position: absolute;
-	top: 6px;
-	right: 8px;
-	z-index: 16;
-	width: 30px;
-	height: 30px;
+.stratum-config-row {
 	display: flex;
 	align-items: center;
-	justify-content: center;
-	border: 1px solid var(--background-modifier-border);
-	border-radius: var(--radius-s);
-	background: var(--interactive-normal);
-	color: var(--text-normal);
+	justify-content: space-between;
+	gap: 8px;
+	font-size: var(--font-ui-small);
 	cursor: pointer;
-	font-size: 14px;
-	box-shadow: var(--shadow-s);
 }
 
-.stratum-sidebar-toggle:hover {
-	background: var(--interactive-hover);
+.stratum-config-row__label {
+	color: var(--text-normal);
+}
+
+.stratum-config-row__danger-btn {
+	font-size: var(--font-ui-small);
+	color: var(--text-error);
+	background: none !important;
+	border: 1px solid var(--text-error);
+	border-radius: var(--radius-s);
+	padding: 3px 8px;
+	cursor: pointer;
+	width: 100%;
+	text-align: left;
+}
+
+.stratum-config-row__danger-btn:disabled {
+	opacity: 0.4;
+	cursor: default;
+}
+
+.stratum-config-row__danger-btn:not(:disabled):hover {
+	background: var(--background-modifier-error) !important;
+}
+
+.stratum-config-row--col {
+	flex-direction: column;
+	align-items: stretch;
+	cursor: default;
+}
+
+.stratum-config-row__input,
+.stratum-config-row__textarea {
+	width: 100%;
+	font-size: var(--font-ui-small);
+}
+
+.stratum-config-row__textarea {
+	resize: vertical;
+	min-height: 80px;
+}
+
+.stratum-config-row__select {
+	font-size: var(--font-ui-small);
+}
+
+.stratum-config-row__color {
+	width: 32px;
+	height: 24px;
+	padding: 0;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-s);
+	cursor: pointer;
+	background: none;
+}
+
+.stratum-config-row__hint {
+	font-size: var(--font-ui-smaller);
+	color: var(--text-muted);
+	margin: 0;
+}
+
+/* Sticky Note module */
+.stratum-sticky {
+	width: 100%;
+	height: 100%;
+	border-radius: var(--radius-m);
+	padding: 10px 12px;
+	overflow: hidden;
+}
+
+.stratum-sticky__content {
+	margin: 0;
+	white-space: pre-wrap;
+	word-break: break-word;
+	line-height: 1.5;
+}
+
+.stratum-sticky__placeholder {
+	font-style: italic;
+}
+
+/* On narrow canvas the config panel covers the entire canvas. */
+.stratum-app--config-fullscreen .stratum-config-panel {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	z-index: 15;
+	background: var(--background-primary);
 }
 
 .stratum-loading {
@@ -256,9 +334,47 @@
 }
 
 /* Habit Matrix */
+/* Label column: single background block, labels stacked with gap matching grid row-gap */
+.stratum-matrix__body {
+	display: flex;
+	column-gap: 3px;
+}
+
+.stratum-matrix__label-col {
+	flex-shrink: 0;
+	width: 110px;
+	background: var(--background-primary);
+	position: relative;
+	z-index: 2;
+	display: flex;
+	flex-direction: column;
+	gap: 3px;
+}
+
+/* Right-edge gradient so the label column blends into the scrollable cells */
+.stratum-matrix__label-col::after {
+	content: '';
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	right: -10px;
+	width: 10px;
+	background: linear-gradient(to right, var(--background-primary), transparent);
+	pointer-events: none;
+}
+
+.stratum-matrix__corner {
+	height: 60px;
+	display: flex;
+	align-items: center;
+	gap: 2px;
+	flex-shrink: 0;
+}
+
 .stratum-matrix__scroll {
 	overflow-x: auto;
-	padding-top: 4px;
+	flex: 1;
+	min-width: 0;
 }
 
 .stratum-matrix__grid {
@@ -266,24 +382,6 @@
 	gap: 3px;
 	align-items: center;
 	width: max-content;
-	/* Center when narrower than the panel; collapses to 0 when overflowing so
-	   the ResizeObserver scroll-pin can keep today at the right edge. */
-	margin: 0 auto;
-}
-
-.stratum-matrix__corner,
-.stratum-matrix__habit-label {
-	position: sticky;
-	left: 0;
-	z-index: 2;
-	align-self: stretch;
-	background: var(--background-primary);
-}
-
-.stratum-matrix__corner {
-	display: flex;
-	align-items: center;
-	gap: 2px;
 }
 
 .stratum-matrix__nav-btn {
@@ -310,19 +408,6 @@
 	padding: 3px 6px;
 }
 
-/* Right-edge gradient so the opaque name column blends into the cells */
-.stratum-matrix__corner::after,
-.stratum-matrix__habit-label::after {
-	content: '';
-	position: absolute;
-	top: 0;
-	bottom: 0;
-	right: -10px;
-	width: 10px;
-	background: linear-gradient(to right, var(--background-primary), transparent);
-	pointer-events: none;
-}
-
 .stratum-matrix__date-header {
 	font-size: 10px;
 	color: var(--text-muted);
@@ -330,7 +415,7 @@
 	writing-mode: vertical-rl;
 	transform: rotate(180deg);
 	padding: 2px 0;
-	max-height: 60px;
+	height: 60px;
 	overflow: hidden;
 	position: relative;
 }
@@ -352,6 +437,8 @@
 }
 
 .stratum-matrix__habit-label {
+	height: 22px;
+	flex-shrink: 0;
 	display: flex;
 	align-items: center;
 	border-left: 3px solid transparent;
@@ -511,10 +598,50 @@
 }
 
 /* Todos */
-.stratum-todos__input-row {
+.stratum-todos {
 	display: flex;
-	gap: 4px;
-	margin-bottom: 8px;
+	flex-direction: column;
+	height: 100%;
+	padding: 4px 2px;
+	overflow: hidden;
+}
+
+.stratum-todos__empty {
+	font-size: var(--font-ui-small);
+	color: var(--text-muted);
+	margin: 0;
+}
+
+.stratum-todos__list-wrap {
+	overflow-y: auto;
+	flex: 1;
+	min-height: 0;
+}
+
+.stratum-todos__divider {
+	height: 1px;
+	background: var(--background-modifier-border);
+	margin: 6px 0;
+}
+
+.stratum-todos__add-btn {
+	margin-top: 4px;
+}
+
+.stratum-todo-item--draft {
+	padding: 1px 0;
+}
+
+.stratum-todo-item__draft-input {
+	flex: 1;
+	font-size: var(--font-ui-small);
+	background: none;
+	border: none;
+	border-bottom: 1px solid var(--background-modifier-border);
+	outline: none;
+	color: var(--text-normal);
+	padding: 0;
+	min-width: 0;
 }
 
 .stratum-todos__list,
@@ -558,6 +685,12 @@
 
 .stratum-todo-item__delete:hover {
 	color: var(--text-error);
+}
+
+.stratum-todo-item__due {
+	font-size: var(--font-ui-smaller);
+	color: var(--text-muted);
+	flex-shrink: 0;
 }
 
 /* Habit Manager */
@@ -748,8 +881,8 @@
 	gap: 4px;
 }
 
-/* Sidebar config page */
-.stratum-sidebar-back {
+/* Config panel back button (shown when drilling into a habit's settings) */
+.stratum-config-panel__back {
 	background: none !important;
 	border: none;
 	border-radius: var(--radius-s);
@@ -768,13 +901,13 @@
 	transition: background 0.1s, color 0.1s;
 }
 
-.stratum-sidebar-back:hover {
+.stratum-config-panel__back:hover {
 	background: var(--interactive-hover) !important;
 	color: var(--text-normal);
 }
 
-/* Config menu when rendered inline as a full sidebar page */
-.stratum-config-menu--sidebar-page {
+/* Config menu when rendered inline inside the config panel */
+.stratum-config-menu--panel-page {
 	width: 100%;
 	border: none;
 	box-shadow: none;

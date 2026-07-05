@@ -1,21 +1,22 @@
 import { TFile } from 'obsidian';
 import type StratumPlugin from './main';
-import type { Category, GridItem, Habit, HabitLog, PersistedStore, StratumData, Todo } from './types';
+import type { Category, FontSize, GridItem, Habit, HabitLog, PersistedStore, StickyNote, StratumData, TextAlign, Todo } from './types';
 import { groupKey, normalizeGroupedHabits, todayISO, UNCATEGORIZED_KEY } from './utils';
 
 export const DEFAULT_LAYOUT: GridItem[] = [
-	{ i: 'matrix',      x: 0, y: 0,  w: 12, h: 12, minW: 3, minH: 4 },
-	{ i: 'heatmap',     x: 0, y: 12, w: 12, h: 8,  minW: 3, minH: 3 },
-	{ i: 'test_yellow', x: 0, y: 20, w: 4,  h: 6,  minW: 1, minH: 1 },
-	{ i: 'test_blue',   x: 4, y: 20, w: 4,  h: 6,  minW: 1, minH: 1 },
-	{ i: 'test_red',    x: 8, y: 20, w: 4,  h: 6,  minW: 1, minH: 1 },
+	{ i: 'matrix',  x: 0, y: 0,  w: 12, h: 12, minW: 3, minH: 4 },
+	{ i: 'heatmap', x: 0, y: 12, w: 12, h: 8,  minW: 3, minH: 3 },
+	{ i: 'todo',    x: 0, y: 20, w: 4,  h: 10, minW: 2, minH: 4 },
 ];
+
+const STICKY_MAX = 10;
 
 const DEFAULT_DATA: StratumData = {
 	habits: [],
 	logs: [],
 	todos: [],
 	categories: [],
+	stickyNotes: [],
 	layout: DEFAULT_LAYOUT,
 };
 
@@ -72,6 +73,7 @@ export class StratumStore {
 				habits: orderedHabits,
 				logs: raw?.data?.logs ?? DEFAULT_DATA.logs,
 				todos: raw?.data?.todos ?? DEFAULT_DATA.todos,
+				stickyNotes: raw?.data?.stickyNotes ?? DEFAULT_DATA.stickyNotes,
 				categories,
 				layout,
 			},
@@ -408,6 +410,44 @@ export class StratumStore {
 
 	async deleteTodo(store: PersistedStore, id: string): Promise<PersistedStore> {
 		const next = { ...store, data: { ...store.data, todos: store.data.todos.filter((t) => t.id !== id) } };
+		await this.save(next);
+		return next;
+	}
+
+	async deleteCompletedTodos(store: PersistedStore): Promise<PersistedStore> {
+		const next = { ...store, data: { ...store.data, todos: store.data.todos.filter((t) => !t.completed) } };
+		await this.save(next);
+		return next;
+	}
+
+	// --- Sticky Notes ---
+
+	canAddStickyNote(store: PersistedStore): boolean {
+		return store.data.stickyNotes.length < STICKY_MAX;
+	}
+
+	async addStickyNote(store: PersistedStore): Promise<{ store: PersistedStore; note: StickyNote }> {
+		const note: StickyNote = {
+			id: Date.now().toString(),
+			title: 'Sticky Note',
+			content: '',
+			bgColor: '#f5e642',
+			textAlign: 'left',
+			fontSize: 'medium',
+		};
+		const next = { ...store, data: { ...store.data, stickyNotes: [...store.data.stickyNotes, note] } };
+		await this.save(next);
+		return { store: next, note };
+	}
+
+	async updateStickyNote(store: PersistedStore, id: string, patch: Partial<Pick<StickyNote, 'title' | 'content' | 'bgColor' | 'textAlign' | 'fontSize'>>): Promise<PersistedStore> {
+		const next = { ...store, data: { ...store.data, stickyNotes: store.data.stickyNotes.map((n) => n.id === id ? { ...n, ...patch } : n) } };
+		await this.save(next);
+		return next;
+	}
+
+	async deleteStickyNote(store: PersistedStore, id: string): Promise<PersistedStore> {
+		const next = { ...store, data: { ...store.data, stickyNotes: store.data.stickyNotes.filter((n) => n.id !== id) } };
 		await this.save(next);
 		return next;
 	}

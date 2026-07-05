@@ -31,6 +31,18 @@ export interface Todo {
 	dueDate?: string; // YYYY-MM-DD
 }
 
+export type TextAlign = 'left' | 'center' | 'right';
+export type FontSize = 'small' | 'medium' | 'large';
+
+export interface StickyNote {
+	id: string;       // matches the module id suffix: module id = `sticky_${id}`
+	title: string;    // shown in the module header
+	content: string;
+	bgColor: string;
+	textAlign: TextAlign;
+	fontSize: FontSize;
+}
+
 // Serialisable form of a react-grid-layout LayoutItem, stored in data.json.
 // Matches the LayoutItem interface so it can be passed to RGL directly.
 export interface GridItem {
@@ -48,6 +60,7 @@ export interface StratumData {
 	logs: HabitLog[];
 	todos: Todo[];
 	categories: Category[];
+	stickyNotes: StickyNote[];
 	layout: GridItem[];
 }
 

@@ -16,6 +16,8 @@ interface HabitMatrixProps {
 	onQuickAddHabitAt: (clientX: number, clientY: number) => void;
 	onSetMatrixDays: (days: number) => void;
 	showDaysInput: boolean;
+	showArchived: boolean;
+	onSetShowArchived: (v: boolean) => void;
 }
 
 function IconChevronLeft(props: SVGProps<SVGSVGElement>) {
@@ -83,14 +85,15 @@ interface NotePopover {
 	y: number;
 }
 
-export default function HabitMatrix({ habits, categories, logMap, monthDays, defaultColor, onToggleLog, onSetLogNote, onHabitContextMenu, onQuickAddHabitAt, onSetMatrixDays, showDaysInput }: HabitMatrixProps) {
+export default function HabitMatrix({ habits, categories, logMap, monthDays, defaultColor, onToggleLog, onSetLogNote, onHabitContextMenu, onQuickAddHabitAt, onSetMatrixDays, showDaysInput, showArchived, onSetShowArchived }: HabitMatrixProps) {
 	const [pageOffset, setPageOffset] = useState(0);
-	const [showArchived, setShowArchived] = useState(false);
 	const [notePopover, setNotePopover] = useState<NotePopover | null>(null);
 	const [noteDraft, setNoteDraft] = useState('');
 	const noteTextareaRef = useRef<HTMLTextAreaElement>(null);
+	const matrixRef = useRef<HTMLDivElement>(null);
 	const scrollRef = useRef<HTMLDivElement>(null);
-	useHorizontalWheelScroll(scrollRef);
+	// Listen on the whole matrix so wheeling over the label column also scrolls.
+	useHorizontalWheelScroll(matrixRef, scrollRef);
 
 	const dates = useMemo(() => getDates(monthDays, pageOffset), [monthDays, pageOffset]);
 	const todayStr = isoDay(0);
@@ -132,7 +135,6 @@ export default function HabitMatrix({ habits, categories, logMap, monthDays, def
 
 	function openNote(habitId: string, date: string, clientX: number, clientY: number) {
 		const log = logMap.get(`${habitId}::${date}`);
-		// Clamp so popover doesn't overflow the viewport bottom.
 		const x = Math.min(clientX, window.innerWidth - POPOVER_W - 8);
 		const y = Math.min(clientY, window.innerHeight - POPOVER_H - 8);
 		setNoteDraft(log?.note ?? '');
@@ -153,21 +155,15 @@ export default function HabitMatrix({ habits, categories, logMap, monthDays, def
 		);
 	}
 
-	const gridTemplate = `${LABEL_WIDTH}px repeat(${dates.length}, ${COL_WIDTH}px)`;
-	// Matches the grid's natural content width so the footer aligns with the
-	// displayed columns (label column through the last date column) rather
-	// than stretching to the full module width.
-	const contentWidth = LABEL_WIDTH + dates.length * (COL_WIDTH + GRID_GAP);
+	const gridTemplate = `repeat(${dates.length}, ${COL_WIDTH}px)`;
+	const contentWidth = LABEL_WIDTH + GRID_GAP + dates.length * (COL_WIDTH + GRID_GAP) - GRID_GAP;
 
 	return (
 		<>
-		<div className="stratum-matrix">
-			<div className="stratum-matrix__scroll" ref={scrollRef}>
-				<div
-					className="stratum-matrix__grid"
-					style={{ gridTemplateColumns: gridTemplate }}
-				>
-					{/* Header row */}
+		<div className="stratum-matrix" ref={matrixRef}>
+			<div className="stratum-matrix__body">
+				{/* Label column: one solid background, no internal gaps visible */}
+				<div className="stratum-matrix__label-col">
 					<div className="stratum-matrix__corner">
 						<button className="stratum-matrix__nav-btn" title="Older" onClick={() => setPageOffset((o) => o + monthDays)}>
 							<IconChevronLeft />
@@ -183,57 +179,69 @@ export default function HabitMatrix({ habits, categories, logMap, monthDays, def
 							</button>
 						)}
 					</div>
-					{dates.map((d, i) => (
-						<div
-							key={d}
-							className={`stratum-matrix__date-header ${d === todayStr ? 'stratum-matrix__date-header--today' : ''}`}
-						>
-							{d === todayStr && <span className="stratum-matrix__today-dot" />}
-							{formatHeader(d, i)}
-						</div>
-					))}
-					{/* Habit rows */}
 					{visibleHabits.map((habit) => {
-						const fill = cellColor(habit);
 						const ribbon = ribbonColor(habit);
 						const isArchived = !isHabitCurrentlyActive(habit);
 						return (
-							<Fragment key={habit.id}>
-								<div
-									className={`stratum-matrix__habit-label ${isArchived ? 'stratum-matrix__habit-label--archived' : ''}`}
-									style={ribbon ? { borderLeftColor: ribbon } : {}}
-									onContextMenu={onHabitContextMenu ? (e) => {
-										e.preventDefault();
-										e.stopPropagation();
-										onHabitContextMenu(habit.id, e.clientX, e.clientY);
-									} : undefined}
-									title={onHabitContextMenu ? 'Right-click to configure' : undefined}
-								>
-									<span className="stratum-matrix__habit-label-text">{habit.name}</span>
-								</div>
-								{dates.map((date) => {
-									const key = `${habit.id}::${date}`;
-									const inactive = !isHabitActiveOn(habit, date);
-									if (inactive) {
-										return <div key={key} className="stratum-cell stratum-cell--inactive" />;
-									}
-									const log = logMap.get(key);
-									return (
-										<MatrixCell
-											key={key}
-											date={date}
-											isCompleted={!!log}
-											hasNote={!!log?.note}
-											color={fill}
-											isToday={date === todayStr}
-											onToggle={() => onToggleLog(habit.id, date)}
-											onOpenNote={(cx, cy) => openNote(habit.id, date, cx, cy)}
-										/>
-									);
-								})}
-							</Fragment>
+							<div
+								key={habit.id}
+								className={`stratum-matrix__habit-label${isArchived ? ' stratum-matrix__habit-label--archived' : ''}`}
+								style={ribbon ? { borderLeftColor: ribbon } : {}}
+								onContextMenu={onHabitContextMenu ? (e) => {
+									e.preventDefault();
+									e.stopPropagation();
+									onHabitContextMenu(habit.id, e.clientX, e.clientY);
+								} : undefined}
+								title={onHabitContextMenu ? 'Right-click to configure' : undefined}
+							>
+								<span className="stratum-matrix__habit-label-text">{habit.name}</span>
+							</div>
 						);
 					})}
+				</div>
+				{/* Scrollable date headers + cells */}
+				<div className="stratum-matrix__scroll" ref={scrollRef}>
+					<div
+						className="stratum-matrix__grid"
+						style={{ gridTemplateColumns: gridTemplate }}
+					>
+						{dates.map((d, i) => (
+							<div
+								key={d}
+								className={`stratum-matrix__date-header${d === todayStr ? ' stratum-matrix__date-header--today' : ''}`}
+							>
+								{d === todayStr && <span className="stratum-matrix__today-dot" />}
+								{formatHeader(d, i)}
+							</div>
+						))}
+						{visibleHabits.map((habit) => {
+							const fill = cellColor(habit);
+							return (
+								<Fragment key={habit.id}>
+									{dates.map((date) => {
+										const key = `${habit.id}::${date}`;
+										const inactive = !isHabitActiveOn(habit, date);
+										if (inactive) {
+											return <div key={key} className="stratum-cell stratum-cell--inactive" />;
+										}
+										const log = logMap.get(key);
+										return (
+											<MatrixCell
+												key={key}
+												date={date}
+												isCompleted={!!log}
+												hasNote={!!log?.note}
+												color={fill}
+												isToday={date === todayStr}
+												onToggle={() => onToggleLog(habit.id, date)}
+												onOpenNote={(cx, cy) => openNote(habit.id, date, cx, cy)}
+											/>
+										);
+									})}
+								</Fragment>
+							);
+						})}
+					</div>
 				</div>
 			</div>
 			<div className="stratum-matrix__footer" style={{ width: contentWidth, maxWidth: '100%' }}>
@@ -247,8 +255,8 @@ export default function HabitMatrix({ habits, categories, logMap, monthDays, def
 				<div className="stratum-matrix__footer-spacer" />
 				{hasArchived && (
 					<button
-						className={`stratum-matrix__footer-btn ${showArchived ? 'stratum-matrix__footer-btn--active' : ''}`}
-						onClick={() => setShowArchived((v) => !v)}
+						className={`stratum-matrix__footer-btn${showArchived ? ' stratum-matrix__footer-btn--active' : ''}`}
+						onClick={() => onSetShowArchived(!showArchived)}
 						title="Toggle archived habits"
 					>
 						{showArchived ? 'Hide archived' : 'Show archived'}

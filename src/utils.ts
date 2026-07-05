@@ -65,17 +65,23 @@ export function isHabitCurrentlyActive(habit: Habit): boolean {
 // columns (~58px) rather than the ~116px a raw deltaY produces.
 const WHEEL_SCROLL_SCALE = 0.5;
 
-export function useHorizontalWheelScroll(ref: RefObject<HTMLElement | null>): void {
+// eventRef: element that captures wheel events (can be a parent of scrollRef)
+// scrollRef: element whose scrollLeft is mutated; defaults to eventRef when omitted
+export function useHorizontalWheelScroll(
+	eventRef: RefObject<HTMLElement | null>,
+	scrollRef?: RefObject<HTMLElement | null>,
+): void {
 	useEffect(() => {
-		const el = ref.current;
-		if (!el) return;
+		const el = eventRef.current;
+		const scrollEl = scrollRef?.current ?? el;
+		if (!el || !scrollEl) return;
 		const onWheel = (e: WheelEvent) => {
-			if (e.deltaY !== 0 && el.scrollHeight <= el.clientHeight && el.scrollWidth > el.clientWidth) {
-				el.scrollLeft += e.deltaY * WHEEL_SCROLL_SCALE;
+			if (e.deltaY !== 0 && scrollEl.scrollHeight <= scrollEl.clientHeight && scrollEl.scrollWidth > scrollEl.clientWidth) {
+				scrollEl.scrollLeft += e.deltaY * WHEEL_SCROLL_SCALE;
 				e.preventDefault();
 			}
 		};
 		el.addEventListener('wheel', onWheel, { passive: false });
 		return () => el.removeEventListener('wheel', onWheel);
-	}, [ref]);
+	}, [eventRef, scrollRef]);
 }

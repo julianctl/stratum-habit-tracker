@@ -1,18 +1,11 @@
 import { useState } from 'react';
-import type { Category, Habit, Todo } from '../types';
-import DailyNoteButton from './DailyNoteButton';
+import type { Category, Habit } from '../types';
 import HabitConfigMenu from './HabitConfigMenu';
 import HabitManager from './HabitManager';
-import TodoPanel from './TodoPanel';
 
-interface SidebarProps {
-	todos: Todo[];
+interface MatrixConfigProps {
 	habits: Habit[];
 	categories: Category[];
-	onAddTodo: (title: string, dueDate?: string) => void;
-	onToggleTodo: (id: string) => void;
-	onDeleteTodo: (id: string) => void;
-	onOpenDailyNote: (date: string) => void;
 	onAddHabit: (name: string, color?: string) => void;
 	onDeleteHabit: (id: string) => void;
 	onRenameHabit: (id: string, name: string) => void;
@@ -34,17 +27,15 @@ interface SidebarProps {
 	onQuickAddHabit: () => Promise<string>;
 }
 
-export default function Sidebar({
-	todos, habits, categories,
-	onAddTodo, onToggleTodo, onDeleteTodo,
-	onOpenDailyNote,
+export default function MatrixConfig({
+	habits, categories,
 	onAddHabit, onDeleteHabit, onRenameHabit, onReorderHabits,
 	onSetHabitColor, onSetHabitCategory, onCreateCategory, onSetCategoryColor,
 	onArchiveHabit, onUnarchiveHabit, onSetHabitStartDate,
 	skipDeleteConfirm, onSetSkipDeleteConfirm,
 	groupByCategory, onMoveHabitInGroup, onReorderCategories, onRenameCategory, onAddHabitToCategory,
 	onQuickAddHabit,
-}: SidebarProps) {
+}: MatrixConfigProps) {
 	const [configHabitId, setConfigHabitId] = useState<string | null>(null);
 	const [newHabitId, setNewHabitId] = useState<string | null>(null);
 
@@ -54,18 +45,17 @@ export default function Sidebar({
 		setConfigHabitId(id);
 	}
 
-	// Config page: replace sidebar content with the habit's settings.
 	if (configHabitId) {
 		const habit = habits.find((h) => h.id === configHabitId);
 		if (habit) {
 			const isNew = newHabitId === configHabitId;
 			return (
-				<div className="stratum-sidebar-content">
-					<button className="stratum-sidebar-back" onClick={() => { setConfigHabitId(null); setNewHabitId(null); }} title="Back">
+				<div className="stratum-config-panel__content">
+					<button className="stratum-config-panel__back" onClick={() => { setConfigHabitId(null); setNewHabitId(null); }} title="Back">
 						←
 					</button>
 					<HabitConfigMenu
-						extraClass="stratum-config-menu--sidebar-page"
+						extraClass="stratum-config-menu--panel-page"
 						habit={habit}
 						categories={categories}
 						initialClearName={isNew}
@@ -88,14 +78,7 @@ export default function Sidebar({
 	}
 
 	return (
-		<div className="stratum-sidebar-content">
-			<DailyNoteButton onOpen={onOpenDailyNote} />
-			<TodoPanel
-				todos={todos}
-				onAddTodo={onAddTodo}
-				onToggleTodo={onToggleTodo}
-				onDeleteTodo={onDeleteTodo}
-			/>
+		<div className="stratum-config-panel__content">
 			<HabitManager
 				habits={habits}
 				categories={categories}

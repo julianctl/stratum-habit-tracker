@@ -1,23 +1,26 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type StratumPlugin from '../main';
-import type { GridItem, HabitLog, PersistedStore } from '../types';
+import type { GridItem, HabitLog, PersistedStore, StickyNote } from '../types';
 import { normalizeGroupedHabits } from '../utils';
 import Dashboard from './Dashboard';
 import HabitConfigMenu from './HabitConfigMenu';
-import Sidebar from './Sidebar';
+import MatrixConfig from './MatrixConfig';
+import StickyNoteConfig from './StickyNoteConfig';
+import TodoConfig from './TodoConfig';
 
 interface AppProps {
 	plugin: StratumPlugin;
 }
 
-// Below this panel width the sidebar collapses into a floating overlay.
+// Below this width the config panel fills the entire canvas instead of docking alongside.
 const COMPACT_WIDTH = 600;
 
 export default function App({ plugin }: AppProps) {
 	const [store, setStore] = useState<PersistedStore | null>(null);
 	const [compact, setCompact] = useState(false);
-	const [sidebarOpen, setSidebarOpen] = useState(false);
+	const [configModuleId, setConfigModuleId] = useState<string | null>(null);
+	const [todoShowCompleted, setTodoShowCompleted] = useState(true);
 	const [floatingMenu, setFloatingMenu] = useState<{ habitId: string; x: number; y: number; isNew?: boolean } | null>(null);
 	const rootRef = useRef<HTMLDivElement>(null);
 
@@ -39,17 +42,12 @@ export default function App({ plugin }: AppProps) {
 		return () => { plugin.onSettingsChange = undefined; };
 	}, []);
 
-	// Collapse the sidebar to an overlay when the panel itself is narrow
-	// (works when docked in the right panel or on mobile, not just the window).
+	// Track whether the canvas is narrow so the config panel can go fullscreen.
 	const hasStore = store !== null;
 	useEffect(() => {
 		const el = rootRef.current;
 		if (!el) return;
-		const update = () => {
-			const isCompact = el.clientWidth < COMPACT_WIDTH;
-			setCompact(isCompact);
-			if (!isCompact) setSidebarOpen(false);
-		};
+		const update = () => setCompact(el.clientWidth < COMPACT_WIDTH);
 		update();
 		const ro = new ResizeObserver(update);
 		ro.observe(el);
@@ -67,8 +65,7 @@ export default function App({ plugin }: AppProps) {
 
 	if (!store) return <div className="stratum-loading">Loading...</div>;
 
-	const { habits, todos, categories } = store.data;
-	const { dailyNoteFolder } = store.settings;
+	const { habits, categories } = store.data;
 
 	function mutate(fn: (s: PersistedStore) => Promise<PersistedStore>): void {
 		void (async () => {
@@ -141,17 +138,29 @@ export default function App({ plugin }: AppProps) {
 		mutate((s) => plugin.store.toggleTodo(s, id));
 	const onDeleteTodo = (id: string) =>
 		mutate((s) => plugin.store.deleteTodo(s, id));
+	const onDeleteCompletedTodos = () =>
+		mutate((s) => plugin.store.deleteCompletedTodos(s));
+
+	// Sticky note mutations
+	// Returns the new module id so Dashboard can add it to localLayout.
+	const onAddStickyNote = async (): Promise<string> => {
+		const { store: next, note } = await plugin.store.addStickyNote(store!);
+		setStore(next);
+		const moduleId = `sticky_${note.id}`;
+		setConfigModuleId(moduleId);
+		return moduleId;
+	};
+	const onDeleteStickyNote = (id: string) =>
+		mutate((s) => plugin.store.deleteStickyNote(s, id));
+	const onUpdateStickyNote = (id: string, patch: Partial<Pick<StickyNote, 'title' | 'content' | 'bgColor' | 'textAlign' | 'fontSize'>>) =>
+		mutate((s) => plugin.store.updateStickyNote(s, id, patch));
 
 	// Floating config menu (right-click on habit label in matrix)
 	const FLOAT_W = 244;
 	const onHabitContextMenu = (habitId: string, clientX: number, clientY: number): void => {
-		// Only clamp horizontally so the panel doesn't overflow the right edge.
-		// Vertical overflow is handled by max-height + overflow-y on the menu itself.
 		const x = Math.min(clientX, window.innerWidth - FLOAT_W - 8);
 		setFloatingMenu({ habitId, x, y: clientY });
 	};
-	// "+ New habit" in the matrix footer: same creation flow as the sidebar's
-	// quick-add, but opens the floating config menu instead of a sidebar page.
 	const onQuickAddHabitAt = (clientX: number, clientY: number): void => {
 		void (async () => {
 			const habitId = await onQuickAddHabit();
@@ -160,14 +169,11 @@ export default function App({ plugin }: AppProps) {
 		})();
 	};
 
-	// Daily note
-	const onOpenDailyNote = (date: string): void => {
-		void plugin.store.openOrCreateDailyNote(date, dailyNoteFolder);
-	};
+	const onOpenConfig = (moduleId: string | null) => setConfigModuleId(moduleId);
 
 	return (
 		<>
-		<div className={`stratum-app ${compact ? 'stratum-app--compact' : ''}`} ref={rootRef}>
+		<div className={`stratum-app${compact && configModuleId ? ' stratum-app--config-fullscreen' : ''}`} ref={rootRef}>
 			<main className="stratum-main">
 				<Dashboard
 					layout={store.data.layout}
@@ -175,6 +181,8 @@ export default function App({ plugin }: AppProps) {
 					categories={categories}
 					logMap={logMap}
 					logs={store.data.logs}
+					todos={store.data.todos}
+					stickyNotes={store.data.stickyNotes}
 					matrixDays={store.settings.matrixDays}
 					defaultColor={store.settings.matrixColorScheme === 'stratum' ? '#a4968e' : undefined}
 					heatmapColor={store.settings.heatmapColor}
@@ -188,56 +196,67 @@ export default function App({ plugin }: AppProps) {
 					onSetMatrixDays={onSetMatrixDays}
 					onSetHeatmapDays={onSetHeatmapDays}
 					onSaveLayout={onSaveLayout}
-				/>
-			</main>
-			{compact && (
-				<button
-					className="stratum-sidebar-toggle"
-					onClick={() => setSidebarOpen((o) => !o)}
-					aria-label={sidebarOpen ? 'Close sidebar' : 'Open sidebar'}
-				>
-					{sidebarOpen ? '✕' : '☰'}
-				</button>
-			)}
-			{compact && sidebarOpen && (
-				<div className="stratum-sidebar-backdrop" onClick={() => setSidebarOpen(false)} />
-			)}
-			<aside className={`stratum-sidebar ${sidebarOpen ? 'stratum-sidebar--open' : ''}`}>
-				<Sidebar
-					todos={todos}
-					habits={habits}
-					categories={categories}
 					onAddTodo={onAddTodo}
 					onToggleTodo={onToggleTodo}
 					onDeleteTodo={onDeleteTodo}
-					onOpenDailyNote={onOpenDailyNote}
-					onAddHabit={onAddHabit}
-					onDeleteHabit={onDeleteHabit}
-					onRenameHabit={onRenameHabit}
-					onReorderHabits={onReorderHabits}
-					onSetHabitColor={onSetHabitColor}
-					onSetHabitCategory={onSetHabitCategory}
-					onCreateCategory={onCreateCategory}
-					onSetCategoryColor={onSetCategoryColor}
-					onArchiveHabit={onArchiveHabit}
-					onUnarchiveHabit={onUnarchiveHabit}
-					onSetHabitStartDate={onSetHabitStartDate}
-					skipDeleteConfirm={store.settings.skipDeleteConfirm}
-					onSetSkipDeleteConfirm={onSetSkipDeleteConfirm}
-					groupByCategory={store.settings.groupByCategory}
-					onMoveHabitInGroup={onMoveHabitInGroup}
-					onReorderCategories={onReorderCategories}
-					onRenameCategory={onRenameCategory}
-					onAddHabitToCategory={onAddHabitToCategory}
-					onQuickAddHabit={onQuickAddHabit}
+					todoShowCompleted={todoShowCompleted}
+					onAddStickyNote={onAddStickyNote}
+					onDeleteStickyNote={onDeleteStickyNote}
+					canAddStickyNote={plugin.store.canAddStickyNote(store)}
+					configModuleId={configModuleId}
+					onOpenConfig={onOpenConfig}
 				/>
-			</aside>
+			</main>
+			{configModuleId && (
+				<aside className="stratum-config-panel">
+					{configModuleId === 'todo' && (
+						<TodoConfig
+							completedCount={store.data.todos.filter((t) => t.completed).length}
+							showCompleted={todoShowCompleted}
+							onSetShowCompleted={(v) => setTodoShowCompleted(v)}
+							onDeleteCompleted={onDeleteCompletedTodos}
+						/>
+					)}
+					{configModuleId.startsWith('sticky_') && (() => {
+						const note = store.data.stickyNotes.find((n) => n.id === configModuleId.slice('sticky_'.length));
+						return note ? (
+							<StickyNoteConfig
+								note={note}
+								onChange={(patch) => onUpdateStickyNote(note.id, patch)}
+							/>
+						) : null;
+					})()}
+					{configModuleId === 'matrix' && (
+						<MatrixConfig
+							habits={habits}
+							categories={categories}
+							onAddHabit={onAddHabit}
+							onDeleteHabit={onDeleteHabit}
+							onRenameHabit={onRenameHabit}
+							onReorderHabits={onReorderHabits}
+							onSetHabitColor={onSetHabitColor}
+							onSetHabitCategory={onSetHabitCategory}
+							onCreateCategory={onCreateCategory}
+							onSetCategoryColor={onSetCategoryColor}
+							onArchiveHabit={onArchiveHabit}
+							onUnarchiveHabit={onUnarchiveHabit}
+							onSetHabitStartDate={onSetHabitStartDate}
+							skipDeleteConfirm={store.settings.skipDeleteConfirm}
+							onSetSkipDeleteConfirm={onSetSkipDeleteConfirm}
+							groupByCategory={store.settings.groupByCategory}
+							onMoveHabitInGroup={onMoveHabitInGroup}
+							onReorderCategories={onReorderCategories}
+							onRenameCategory={onRenameCategory}
+							onAddHabitToCategory={onAddHabitToCategory}
+							onQuickAddHabit={onQuickAddHabit}
+						/>
+					)}
+				</aside>
+			)}
 		</div>
 		{floatingMenu && (() => {
 			const habit = habits.find((h) => h.id === floatingMenu.habitId);
 			if (!habit) return null;
-			// Portal into document.body so position:fixed is relative to the true
-			// viewport, not Obsidian's transformed pane container.
 			return createPortal(
 				<>
 					<div className="stratum-float-backdrop" onClick={() => setFloatingMenu(null)} />
